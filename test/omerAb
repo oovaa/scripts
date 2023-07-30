@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# for i in omer*; do
+#     # w="A"
+#     s=$(echo "$i" | grep -oE 'c[0-9]+')
+#     # echo $s
+#     fn="${i:s}"
+#     echo "$fn"
+
+# done
+for f in *; do
+    # Extract the Abdu index from the filename
+    index=$(echo "$f" | grep -oE 'class[0-9]+')
+
+    # Print the index if it was found
+    # mv "$f" "${f:index}"
+    # if [[ -n "$index" ]]; then
+    #     echo "$index"
+    # fi
+     if [[ -n "$index" ]]; then
+        mv "$f" "$index${f#*${index}}"
+    fi
+done
