@@ -1,7 +1,9 @@
 #!/bin/bash
 git add .
 echo "files are added"
-git commit -am "$1"
+echo
+git commit -am "$1 at $(date +%Y-%m-%d)"
 echo "files are commited"
+echo
 git push
 echo "pushed"
