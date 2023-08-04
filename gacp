@@ -1,4 +1,7 @@
 #!/bin/bash
 git add .
+echo "files are added"
 git commit -am "$1"
+echo "files are commited"
 git push
+echo "pushed"
