@@ -1,16 +1,28 @@
 #!/bin/bash
 
-for number in {1..100}; do
-    if [[ $(expr $number % 3) -eq 0 ]] && [[ $(expr $number % 5) -eq 0 ]]; then
-        echo "FizzBuzz"
-    elif [[ $(expr $number % 3) -eq 0 ]]; then
-        echo "Fizz"
-    elif [[ $(expr $number % 5) -eq 0 ]]; then
-        echo "Buzz"
-    else
-        echo $number
-    fi
-done
+echo $1
+
+# a="omer"
+# c="abdo"
+# echo $a $c
+# echo ${#a}
+# echo ${#c}
+# declare -i ik=2
+# echo $ik
+# ik=$((55+23))
+# echo $ik
+
+# [[ 6 -gt 3 ]]
+# echo $?
+# dirc=$(find $1 -type d | wc -l)
+# filec=$(find $1 -type f | wc -l)
+# echo "Dirs:"$dirc "  Files:"$filec "  "
+
+# ec/ho $#
+
+# l=$(ls -lh $1 | wc -l)
+
+# echo "there are $(("$l"-1)) lines"
 
 # echo hi $1 u r $2 y/o
 
