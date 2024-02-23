@@ -1,7 +1,30 @@
 #!/bin/bash
 
-echo $1
+printf "Name:\t%s\nID:\t%04d\n" "Omar" "1231"
 
+# echo -e "\033[5;31;40mERROR: \033[0m\033[31;40mSomthing went wrong.\033[0m"
+# date -u +%Y-%m-%dT%H:%M:%S%Z
+# date -u +%d-%m-%Y
+# a=omar
+# c=abdo
+# v="$a $c"
+# echo ${#v}
+# d=${v: -4:-2}
+# echo $d
+
+# echo $v
+# w=${v/${v:5:2}/tata}
+# echo $w
+# read a
+
+# if [ -z $a ]; then
+#     echo it is null \(embty\)
+# else
+#     echo it not is null \(embty\)
+# fi
+
+# [[ "omar" == "omr" ]]
+# echo $?
 # a="omer"
 # c="abdo"
 # echo $a $c
