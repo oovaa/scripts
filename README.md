@@ -1,6 +1,4 @@
-Certainly! Here's the README template in a single block of code for easy copying:
-
-```markdown
+ة```markdown
 # Git Automation Script
 
 This Bash script automates common Git operations, making it easier to add changes, commit, tag, and push to a remote repository. It's designed to streamline the workflow and provide a convenient way to perform these tasks in a single script.
@@ -38,7 +36,7 @@ This Bash script automates common Git operations, making it easier to add change
 
 ## Notes
 
-- Ensure that you have the necessary permissions to perform Git operations.
+- Ensure that you have the necessary permissions to perform Git operations and then move the script to one of your path directories.
 
 ## License
 
