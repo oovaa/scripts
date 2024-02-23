@@ -36,9 +36,12 @@ if [ "$#" -eq 2 ]; then
 fi
 
 # Push changes and tags
-if ! git push --tags; then
+if ! git push; then
     echo -e "${RED}Error: Unable to push changes and tags to the remote repository.${NC}"
     exit 1
 fi
 
+git push --tags
+
 echo -e "${GREEN}Changes and tags pushed successfully.${NC}"
+
