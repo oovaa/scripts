@@ -1,9 +1,44 @@
 #!/bin/bash
-git add .
-echo "files are added"
+
+# ANSI color codes
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
+# Check the number of arguments
+if [ "$#" -lt 1 ] || [ "$#" -gt 2 ]; then
+    echo -e "${RED}Usage: $0 <commit_message> [tag_name]${NC}"
+    exit 1
+fi
+
+# Add changes to the staging area
+if ! git add .; then
+    echo -e "${RED}Error: Unable to add files to the staging area.${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}Files are added to the staging area.${NC}"
 echo
-git commit -am "$1 at $(date +%Y-%m-%d)"
-echo "files are commited"
-echo
-git push
-echo "pushed"
+
+# Commit changes
+commit_message="$1 at $(date +%d-%H)"
+if ! git commit -am "$commit_message"; then
+    echo -e "${RED}Error: Unable to commit changes.${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}Files are committed with the message: $commit_message${NC}"
+
+# Tagging (if two arguments provided)
+if [ "$#" -eq 2 ]; then
+    git tag "$2"
+    echo -e "${GREEN}Tag $2 created.${NC}"
+fi
+
+# Push changes and tags
+if ! git push --tags; then
+    echo -e "${RED}Error: Unable to push changes and tags to the remote repository.${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}Changes and tags pushed successfully.${NC}"
