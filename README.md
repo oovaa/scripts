@@ -1,4 +1,4 @@
-ة```markdown
+```markdown
 # Git Automation Script
 
 This Bash script automates common Git operations, making it easier to add changes, commit, tag, and push to a remote repository. It's designed to streamline the workflow and provide a convenient way to perform these tasks in a single script.
