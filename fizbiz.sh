@@ -8,7 +8,7 @@ for i in {1..100}; do
         echo biz
 
     else
-        echo $i
+        echo "$i"
 
     fi
 
