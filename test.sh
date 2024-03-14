@@ -1,6 +1,35 @@
 #!/bin/bash
 
-printf "Name:\t%s\nID:\t%04d\n" "Omar" "1231"
+name_age() {
+    read -rp "What is your name? " name
+    read -rp "how old r u? " age
+
+    greet="hi $name"
+
+    echo "$greet"
+
+    if [ $age -gt 18 ]; then
+        echo "u r an adult"
+
+    else
+        echo "u r a kid"
+
+    fi
+
+    i=10
+    # while [true]
+    # until [false]
+    while [ $i -ne 0 ] && [ $# -gt 1 ]; do
+        echo "$i"
+        ((i--))
+        sleep 1s
+
+    done
+
+}
+
+name_age 23
+# printf "Name:\t%s\nID:\t%04d\n" "Omar" "1231"
 
 # echo -e "\033[5;31;40mERROR: \033[0m\033[31;40mSomthing went wrong.\033[0m"
 # date -u +%Y-%m-%dT%H:%M:%S%Z
