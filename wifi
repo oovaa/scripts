@@ -1,0 +1,19 @@
+#!/bin/bash
+
+# Check the current Wi-Fi status
+wifi_status=$(nmcli radio wifi)
+
+if [ "$wifi_status" == "enabled" ]; then
+    # If Wi-Fi is enabled, turn it off
+    nmcli radio wifi off
+    echo "Wi-Fi turned off"
+else
+    # If Wi-Fi is disabled, turn it on
+    nmcli radio wifi on
+    echo "Wi-Fi turned on"
+fi
+
+# add to path so u can use it anywhere
+# Assuming the script is named 'wifi' and is in the current directory
+# chmod +x wifi
+# sudo ln wifi /usr/local/bin/wifi
