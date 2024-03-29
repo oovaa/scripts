@@ -1,4 +1,38 @@
-```markdown
+# Bash Scripts Collection
+
+This repository contains a collection of Bash scripts designed to automate various tasks.
+
+## Scripts
+
+### [meta-overview.bash](meta-overview.bash)
+
+This script allows you to toggle the Overview feature in KRunner with the Meta key.
+
+Usage: `./meta-overview.bash`
+
+### [wifi](wifi)
+
+This script allows you to toggle your Wi-Fi status on and off using the `nmcli` command.
+
+Usage: `./wifi`
+
+### [uniupdate](uniupdate)
+
+This script automates the process of updating and upgrading your system packages, npm packages, and Python packages.
+
+Usage: `./uniupdate`
+
+## Requirements
+
+- Bash shell
+- For each script, additional requirements may apply (e.g., Git, nmcli, npm, pip)
+
+## Notes
+
+- Ensure that you have the necessary permissions to run these scripts.
+- To use these scripts from anywhere, move them to one of your PATH directories.
+
+
 # Git Automation Script
 
 This Bash script automates common Git operations, making it easier to add changes, commit, tag, and push to a remote repository. It's designed to streamline the workflow and provide a convenient way to perform these tasks in a single script.
@@ -13,7 +47,7 @@ This Bash script automates common Git operations, making it easier to add change
 ## Usage
 
 ```bash
-./git-automation.sh <commit_message> [tag_name]
+./gacp <commit_message> [tag_name]
 ```
 
 - `<commit_message>`: Required. The commit message for the changes.
@@ -22,11 +56,11 @@ This Bash script automates common Git operations, making it easier to add change
 ## Examples
 
 ```bash
-./git-automation.sh "Initial commit"
+./gacp "Initial commit"
 ```
 
 ```bash
-./git-automation.sh "Feature XYZ implemented" v1.0.0
+./gacp "Feature XYZ implemented" v1.0.0
 ```
 
 ## Requirements
