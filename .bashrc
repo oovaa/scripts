@@ -138,7 +138,9 @@ alias l='ls -cf'
 alias ..='cd ..'
 alias grep='grep --color=auto'
 alias rsaloc='~/.ssh/id_rsa'
-alias connect='ssh -i ~/.ssh/id_rsa  ubuntu@54.165.78.43'
+alias web1='ssh -i ~/.ssh/id_rsa  ubuntu@54.165.78.43'
+alias web2='ssh -i ~/.ssh/id_rsa  ubuntu@54.84.65.46'
+alias lb='ssh -i ~/.ssh/id_rsa  ubuntu@54.160.99.228'
 alias penv="source venv/bin/activate"
 alias wifi="wifi toggle"
 alias gstat="git status"
