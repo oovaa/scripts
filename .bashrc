@@ -178,6 +178,11 @@ alias glog='git log --graph --oneline --decorate'
 alias gd='git diff'
 # git diff --cached - Show changes between the index (staging area) and the HEAD
 alias gdc='git diff --cached'
+# git status - Show the current status of the repository
+alias gss='git status --short'   # Short and concise status
+alias gsl='git status --long'    # Detailed status with full file paths
+alias gsu='git status --untracked-files'   # Show untracked files
+alias gsi='git status --ignored'   # Show ignored files
 
 
 # Custom functions
