@@ -122,7 +122,6 @@ alias list='apt list --upgradable'
 alias fuck='thefuck'
 alias lsd='ls -d */'
 alias v='vim'
-alias glog='git log --graph --oneline --decorate'
 alias stz='exec zsh'
 #alias rm='trash'
 alias bcat='batcat'
@@ -143,8 +142,43 @@ alias web2='ssh -i ~/.ssh/id_rsa  ubuntu@54.84.65.46'
 alias lb='ssh -i ~/.ssh/id_rsa  ubuntu@54.160.99.228'
 alias penv="source venv/bin/activate"
 alias wifi="wifi toggle"
-alias gstat="git status"
 alias install="sudo nala install"
+
+# git status - Show the current status of the repository
+alias gs='git status'
+# git add - Add changes to the staging area
+alias ga='git add'
+# git commit - Commit changes to the repository
+alias gc='git commit'
+# git push - Push committed changes to a remote repository
+alias gp='git push'
+# git pull - Fetch and merge changes from a remote repository
+alias gpl='git pull'
+# git branch - List, create, or delete branches
+alias gb='git branch'
+# git checkout - Switch branches or restore working tree files
+alias gco='git checkout'
+# git checkout -b - Create and switch to a new branch
+alias gcb='git checkout -b'
+# git switch - Switch branches
+alias gs='git switch'
+# git switch -c - Create and switch to a new branch
+alias gsn='git switch -c'
+# git branch -d - Delete a specified branch
+alias gbd='git branch -d'
+# git reset --hard - Reset the current HEAD to a specified state, discarding changes
+alias grh='git reset --hard'
+# git reset --soft - Reset the current HEAD to a specified state, keeping changes in the working directory and staging area
+alias grs='git reset --soft'
+# git log - Show commit logs
+alias gl='git log'
+# git log --pretty=format - Show a custom formatted commit log
+alias glog='git log --graph --oneline --decorate'
+# git diff - Show changes between commits, commit and working tree, etc.
+alias gd='git diff'
+# git diff --cached - Show changes between the index (staging area) and the HEAD
+alias gdc='git diff --cached'
+
 
 # Custom functions
 extract() {

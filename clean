@@ -1,0 +1,53 @@
+#!/bin/bash
+set -e # Exit immediately if a command exits with a non-zero status.
+
+echo "Starting system cleanup process..."
+
+# Clean package cache
+echo "Cleaning package cache..."
+sudo nala clean
+
+# Managing System Logs
+echo "Checking current disk usage by journal logs..."
+sudo journalctl --disk-usage
+
+echo "Rotating journal logs..."
+sudo journalctl --rotate
+
+echo "Cleaning up old journal logs..."
+sudo journalctl --vacuum-time 1d
+
+echo "Checking disk usage by journal logs after cleanup..."
+sudo journalctl --disk-usage
+
+# Uncomment the following lines if you want to use them after reviewing their actions
+#echo "Trimming filesystem..."
+#sudo fstrim -va
+
+#echo "Purging residual config packages..."
+#sudo dpkg --purge $(COLUMNS=200 dpkg -l | grep "^rc" | tr -s ' ' | cut -d ' ' -f 2)
+
+#echo "Removing orphaned packages with deborphan..."
+#sudo deborphan | xargs sudo apt-get -y remove --purge
+
+# Clean /tmp Directory
+# Caution: This will remove all files and directories in /tmp. Ensure no critical operations are using /tmp.
+echo "Cleaning /tmp directory..."
+sudo rm -rf /tmp/*
+
+# Auto-remove unneeded packages
+echo "Removing unneeded packages..."
+sudo nala autoremove -y
+
+echo "System cleanup process completed!"
+
+
+#sudo nala clean
+#sudo journalctl --disk-usage
+#sudo journalctl --rotate
+#sudo journalctl --vacuum-time 1d
+#sudo journalctl --disk-usage
+#sudo fstrim -va
+#sudo dpkg --purge $(COLUMNS=200 dpkg -l | grep "^rc" | tr -s ' ' | cut -d ' ' -f 2)
+#sudo deborphan | xargs sudo apt-get -y remove --purge
+
