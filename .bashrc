@@ -153,7 +153,7 @@ alias gc='git commit'
 # git push - Push committed changes to a remote repository
 alias gp='git push'
 # git pull - Fetch and merge changes from a remote repository
-alias gpl='git pull'
+alias gpl='git pull --rebase'
 # git branch - List, create, or delete branches
 alias gb='git branch'
 # git checkout - Switch branches or restore working tree files
@@ -183,6 +183,7 @@ alias gss='git status --short'   # Short and concise status
 alias gsl='git status --long'    # Detailed status with full file paths
 alias gsu='git status --untracked-files'   # Show untracked files
 alias gsi='git status --ignored'   # Show ignored files
+alias gf='git fetch'   # Show ignored files
 
 
 # Custom functions

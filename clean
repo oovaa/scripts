@@ -21,14 +21,14 @@ echo "Checking disk usage by journal logs after cleanup..."
 sudo journalctl --disk-usage
 
 # Uncomment the following lines if you want to use them after reviewing their actions
-#echo "Trimming filesystem..."
-#sudo fstrim -va
+# echo "Trimming filesystem..."
+# sudo fstrim -va
 
-#echo "Purging residual config packages..."
-#sudo dpkg --purge $(COLUMNS=200 dpkg -l | grep "^rc" | tr -s ' ' | cut -d ' ' -f 2)
+# echo "Purging residual config packages..."
+# sudo dpkg --purge $(COLUMNS=200 dpkg -l | grep "^rc" | tr -s ' ' | cut -d ' ' -f 2)
 
-#echo "Removing orphaned packages with deborphan..."
-#sudo deborphan | xargs sudo apt-get -y remove --purge
+# echo "Removing orphaned packages with deborphan..."
+# sudo deborphan | xargs sudo apt-get -y remove --purge
 
 # Clean /tmp Directory
 # Caution: This will remove all files and directories in /tmp. Ensure no critical operations are using /tmp.
