@@ -24,8 +24,8 @@ sudo journalctl --disk-usage
 # echo "Trimming filesystem..."
 # sudo fstrim -va
 
-# echo "Purging residual config packages..."
-# sudo dpkg --purge $(COLUMNS=200 dpkg -l | grep "^rc" | tr -s ' ' | cut -d ' ' -f 2)
+echo "Purging residual config packages..."
+sudo dpkg --purge $(COLUMNS=200 dpkg -l | grep "^rc" | tr -s ' ' | cut -d ' ' -f 2) 2> /dev/null
 
 # echo "Removing orphaned packages with deborphan..."
 # sudo deborphan | xargs sudo apt-get -y remove --purge
@@ -51,3 +51,4 @@ echo "System cleanup process completed!"
 #sudo dpkg --purge $(COLUMNS=200 dpkg -l | grep "^rc" | tr -s ' ' | cut -d ' ' -f 2)
 #sudo deborphan | xargs sudo apt-get -y remove --purge
 
+sudo powertop --auto-tune
