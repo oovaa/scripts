@@ -1,54 +1,50 @@
 #!/bin/bash
 set -e # Exit immediately if a command exits with a non-zero status.
 
-echo "Starting system cleanup process..."
+# Define color variables
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+echo -e "${GREEN}Starting system cleanup process...${NC}"
 
 # Clean package cache
-echo "Cleaning package cache..."
+echo -e "${YELLOW}Cleaning package cache...${NC}"
 sudo nala clean
 
 # Managing System Logs
-echo "Checking current disk usage by journal logs..."
+echo -e "${YELLOW}Checking current disk usage by journal logs...${NC}"
 sudo journalctl --disk-usage
 
-echo "Rotating journal logs..."
+echo -e "${YELLOW}Rotating journal logs...${NC}"
 sudo journalctl --rotate
 
-echo "Cleaning up old journal logs..."
+echo -e "${YELLOW}Cleaning up old journal logs...${NC}"
 sudo journalctl --vacuum-time 1d
 
-echo "Checking disk usage by journal logs after cleanup..."
+echo -e "${YELLOW}Checking disk usage by journal logs after cleanup...${NC}"
 sudo journalctl --disk-usage
 
 # Uncomment the following lines if you want to use them after reviewing their actions
-# echo "Trimming filesystem..."
+# echo -e "${YELLOW}Trimming filesystem...${NC}"
 # sudo fstrim -va
 
-echo "Purging residual config packages..."
-sudo dpkg --purge $(COLUMNS=200 dpkg -l | grep "^rc" | tr -s ' ' | cut -d ' ' -f 2) 2> /dev/null
+echo -e "${YELLOW}Purging residual config packages...${NC}"
+sudo dpkg --purge "$(COLUMNS=200 dpkg -l | grep "^rc" | tr -s ' ' | cut -d ' ' -f 2)" 2>/dev/null
 
-# echo "Removing orphaned packages with deborphan..."
+# echo -e "${YELLOW}Removing orphaned packages with deborphan...${NC}"
 # sudo deborphan | xargs sudo apt-get -y remove --purge
 
 # Clean /tmp Directory
 # Caution: This will remove all files and directories in /tmp. Ensure no critical operations are using /tmp.
-echo "Cleaning /tmp directory..."
+echo -e "${RED}Cleaning /tmp directory...${NC}"
 sudo rm -rf /tmp/*
 
 # Auto-remove unneeded packages
-echo "Removing unneeded packages..."
+echo -e "${YELLOW}Removing unneeded packages...${NC}"
 sudo nala autoremove -y
 
-echo "System cleanup process completed!"
-
-
-#sudo nala clean
-#sudo journalctl --disk-usage
-#sudo journalctl --rotate
-#sudo journalctl --vacuum-time 1d
-#sudo journalctl --disk-usage
-#sudo fstrim -va
-#sudo dpkg --purge $(COLUMNS=200 dpkg -l | grep "^rc" | tr -s ' ' | cut -d ' ' -f 2)
-#sudo deborphan | xargs sudo apt-get -y remove --purge
+echo -e "${GREEN}System cleanup process completed!${NC}"
 
 sudo powertop --auto-tune
