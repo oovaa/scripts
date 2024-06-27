@@ -7,44 +7,100 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-echo -e "${GREEN}Starting system cleanup process...${NC}"
+# Log output
+LOG_FILE="/var/log/system_cleanup.log"
+exec > >(tee -i ${LOG_FILE}) 2>&1
+
+# Function to print messages with color
+print_message() {
+  color=$1
+  message=$2
+  echo -e "${color}${message}${NC}"
+}
+
+print_message "${GREEN}" "Starting system cleanup process..."
+
+# Disk space usage before cleanup
+print_message "${YELLOW}" "Disk space usage before cleanup:"
+df -h
+
+# Update package lists and upgrade installed packages
+# print_message "${YELLOW}" "Updating package lists and upgrading installed packages..."
+# sudo nala update && sudo nala upgrade -y
 
 # Clean package cache
-echo -e "${YELLOW}Cleaning package cache...${NC}"
+print_message "${YELLOW}" "Cleaning package cache..."
 sudo nala clean
 
 # Managing System Logs
-echo -e "${YELLOW}Checking current disk usage by journal logs...${NC}"
+print_message "${YELLOW}" "Checking current disk usage by journal logs..."
 sudo journalctl --disk-usage
 
-echo -e "${YELLOW}Rotating journal logs...${NC}"
+print_message "${YELLOW}" "Rotating journal logs..."
 sudo journalctl --rotate
 
-echo -e "${YELLOW}Cleaning up old journal logs...${NC}"
-sudo journalctl --vacuum-time 1d
+print_message "${YELLOW}" "Cleaning up old journal logs..."
+sudo journalctl --vacuum-time=1d
 
-echo -e "${YELLOW}Checking disk usage by journal logs after cleanup...${NC}"
+print_message "${YELLOW}" "Checking disk usage by journal logs after cleanup..."
 sudo journalctl --disk-usage
 
 # Uncomment the following lines if you want to use them after reviewing their actions
-# echo -e "${YELLOW}Trimming filesystem...${NC}"
+# print_message "${YELLOW}" "Trimming filesystem..."
 # sudo fstrim -va
 
-echo -e "${YELLOW}Purging residual config packages...${NC}"
-sudo dpkg --purge "$(COLUMNS=200 dpkg -l | grep "^rc" | tr -s ' ' | cut -d ' ' -f 2)" 2>/dev/null
+print_message "${YELLOW}" "Purging residual config packages..."
+residual_packages=$(dpkg -l | grep "^rc" | tr -s ' ' | cut -d ' ' -f 2)
+if [ -n "$residual_packages" ]; then
+  echo "$residual_packages" | xargs sudo dpkg --purge
+else
+  print_message "${GREEN}" "No residual config packages found."
+fi
 
-# echo -e "${YELLOW}Removing orphaned packages with deborphan...${NC}"
-# sudo deborphan | xargs sudo apt-get -y remove --purge
+# Uncomment the following lines if you want to use them after reviewing their actions
+# print_message "${YELLOW}" "Removing orphaned packages with deborphan..."
+# orphaned_packages=$(sudo deborphan)
+# if [ -n "$orphaned_packages" ]; then
+#   echo "$orphaned_packages" | xargs sudo apt-get -y remove --purge
+# else
+#   print_message "${GREEN}" "No orphaned packages found."
+# fi
 
 # Clean /tmp Directory
 # Caution: This will remove all files and directories in /tmp. Ensure no critical operations are using /tmp.
-echo -e "${RED}Cleaning /tmp directory...${NC}"
+print_message "${RED}" "Cleaning /tmp directory..."
 sudo rm -rf /tmp/*
 
 # Auto-remove unneeded packages
-echo -e "${YELLOW}Removing unneeded packages...${NC}"
+print_message "${YELLOW}" "Removing unneeded packages..."
 sudo nala autoremove -y
 
-echo -e "${GREEN}System cleanup process completed!${NC}"
+# Remove unused kernels
+print_message "${YELLOW}" "Removing unused kernels..."
+sudo nala autoremove --purge -y
 
+# Clean Apt cache
+print_message "${YELLOW}" "Cleaning Apt cache..."
+sudo apt-get clean
+
+# Clean up Docker (if Docker is installed)
+if command -v docker &> /dev/null; then
+  print_message "${YELLOW}" "Cleaning up Docker..."
+  docker system prune -a -f
+fi
+
+# Remove old Snap versions (if Snap is used)
+if command -v snap &> /dev/null; then
+  print_message "${YELLOW}" "Removing old Snap versions..."
+  sudo snap list --all | awk '/disabled/{print $1, $3}' | while read snapname revision; do sudo snap remove "$snapname" --revision="$revision"; done
+fi
+
+# Improving power usage using powertop
+print_message "${YELLOW}" "Improving power usage using powertop..."
 sudo powertop --auto-tune
+
+# Disk space usage after cleanup
+print_message "${YELLOW}" "Disk space usage after cleanup:"
+df -h
+
+print_message "${GREEN}" "System cleanup process completed!"
