@@ -179,30 +179,29 @@ alias gd='git diff'
 # git diff --cached - Show changes between the index (staging area) and the HEAD
 alias gdc='git diff --cached'
 # git status - Show the current status of the repository
-alias gss='git status --short'   # Short and concise status
-alias gsl='git status --long'    # Detailed status with full file paths
-alias gsu='git status --untracked-files'   # Show untracked files
-alias gsi='git status --ignored'   # Show ignored files
-alias gf='git fetch'   # Show ignored files
-
+alias gss='git status --short'           # Short and concise status
+alias gsl='git status --long'            # Detailed status with full file paths
+alias gsu='git status --untracked-files' # Show untracked files
+alias gsi='git status --ignored'         # Show ignored files
+alias gf='git fetch'                     # Show ignored files
 
 # Custom functions
 extract() {
-    if [ -f $1 ] ; then
+    if [ -f "$1" ]; then
         case $1 in
-            *.tar.bz2)   tar xvjf $1    ;;
-            *.tar.gz)    tar xvzf $1    ;;
-            *.tar.xz)    tar xvJf $1    ;;
-            *.bz2)       bunzip2 $1     ;;
-            *.rar)       unrar x $1     ;;
-            *.gz)        gunzip $1      ;;
-            *.tar)       tar xvf $1     ;;
-            *.tbz2)      tar xvjf $1    ;;
-            *.tgz)       tar xvzf $1    ;;
-            *.zip)       unzip $1       ;;
-            *.Z)         uncompress $1  ;;
-            *.7z)        7z x $1        ;;
-            *)           echo "Unknown archive format" ;;
+        *.tar.bz2) tar xvjf "$1" ;;
+        *.tar.gz) tar xvzf "$1" ;;
+        *.tar.xz) tar xvJf "$1" ;;
+        *.bz2) bunzip2 "$1" ;;
+        *.rar) unrar x "$1" ;;
+        *.gz) gunzip "$1" ;;
+        *.tar) tar xvf "$1" ;;
+        *.tbz2) tar xvjf "$1" ;;
+        *.tgz) tar xvzf "$1" ;;
+        *.zip) unzip "$1" ;;
+        *.Z) uncompress "$1" ;;
+        *.7z) 7z x "$1" ;;
+        *) echo "Unknown archive format" ;;
         esac
     else
         echo "File does not exist"
@@ -211,14 +210,14 @@ extract() {
 
 # Enable colorized output for some commands
 export LS_OPTIONS='--color=auto'
-eval "`dircolors`"
+eval "$(dircolors)"
 
-source /etc/profile.d/bash_completion.sh
 
 export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"                   # This loads nvm
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion" # This loads nvm bash_completion
 
 # bun
 export BUN_INSTALL="$HOME/.bun"
 export PATH=$BUN_INSTALL/bin:$PATH
+export PATH=$PATH:~/.local/bin
