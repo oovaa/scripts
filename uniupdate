@@ -1,8 +1,8 @@
 #!/bin/bash
 sudo nala update
 sudo nala upgrade -y
-npm update
-pip install --upgrade $(pip freeze | awk '{split($0, a, "=="); print a[1]}')
+bun update
+pip install --upgrade "$(pip freeze | awk '{split($0, a, "=="); print a[1]}')"
 #pip-review --auto
 #pip freeze | cut -d '=' -f 1 | xargs -n 1 pip install --upgrade
 #upgrades all
