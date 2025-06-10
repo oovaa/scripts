@@ -6,8 +6,11 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-scripts_path="$HOME/.bin"
+scripts_path="$HOME/.$USER-bin"
 script_name="$1"
+rc_file=.zshrc
+
+echo $scripts_path
 
 # Create the directory if it doesn't exist
 if [[ ! -d "$scripts_path" ]]; then
@@ -21,10 +24,10 @@ fi
 
 exists=$(echo "$PATH" | tr ':' '\n' | grep "$scripts_path")
 if [ -z "$exists" ]; then
-    echo "export PATH="$PATH:$HOME/.bin"" >> "$HOME/.bashrc"
+    echo "export PATH=""$PATH":"$scripts_path""" >> "$HOME/$rc_file"
 fi
 
-# Create a symbolic link
+# # Create a symbolic link
 ln -f "$script_name" "$scripts_path"
 if [[ $? -eq 0 ]]; then
     echo -e "${GREEN}Linked $script_name to $scripts_path${NC}"
