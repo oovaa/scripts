@@ -10,14 +10,14 @@ scripts_path="$HOME/.$USER-bin"
 script_name="$1"
 rc_file=.zshrc
 
-echo $scripts_path
+echo "$scripts_path"
 
 # Create the directory if it doesn't exist
 if [[ ! -d "$scripts_path" ]]; then
     mkdir -p "$scripts_path"
     echo -e "${GREEN}Created directory $scripts_path${NC}"
 else
-    echo -e "${YELLOW}Directory $scripts_path already exists${NC}"
+    echo -e "${GREEN}Directory $scripts_path already exists${NC}"
 fi
 
 
@@ -25,14 +25,33 @@ fi
 exists=$(echo "$PATH" | tr ':' '\n' | grep "$scripts_path")
 if [ -z "$exists" ]; then
     echo "export PATH=""$PATH":"$scripts_path""" >> "$HOME/$rc_file"
+    else
+    echo -e "${GREEN}Dir already in your path${NC}"
 fi
 
-# # Create a symbolic link
-ln -f "$script_name" "$scripts_path"
-if [[ $? -eq 0 ]]; then
-    echo -e "${GREEN}Linked $script_name to $scripts_path${NC}"
+
+
+# Handle '*' argument to install all scripts in the folder
+if [[ "$script_name" == * ]]; then
+    for file in $(ls -1 | grep -v install); do
+
+        # Only link regular files, skip directories and install script itself
+        if [[ -f "$file" ]]; then
+            ln -f "$file" "$scripts_path"
+            if [[ $? -eq 0 ]]; then
+                echo -e "${GREEN}Linked $file to $scripts_path${NC}"
+            else
+                echo -e "${RED}Failed to link $file to $scripts_path${NC}"
+            fi
+        fi
+    done
 else
-    echo -e "${RED}Failed to link $script_name to $scripts_path${NC}"
+    ln -f "$script_name" "$scripts_path"
+    if [[ $? -eq 0 ]]; then
+        echo -e "${GREEN}Linked $script_name to $scripts_path${NC}"
+    else
+        echo -e "${RED}Failed to link $script_name to $scripts_path${NC}"
+    fi
 fi
 
 exec $SHELL
