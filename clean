@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e # Exit immediately if a command exits with a non-zero status.
+# Continue even if a command fails
 
 # Define color variables
 RED='\033[0;31m'
@@ -22,7 +22,7 @@ print_message "${GREEN}" "Starting system cleanup process..."
 
 # Disk space usage before cleanup
 print_message "${YELLOW}" "Disk space usage before cleanup:"
-df -h
+df -h || true
 
 # Update package lists and upgrade installed packages
 # print_message "${YELLOW}" "Updating package lists and upgrading installed packages..."
@@ -30,20 +30,20 @@ df -h
 
 # Clean package cache
 print_message "${YELLOW}" "Cleaning package cache..."
-sudo nala clean
+sudo nala clean || true
 
 # Managing System Logs
 print_message "${YELLOW}" "Checking current disk usage by journal logs..."
-sudo journalctl --disk-usage
+sudo journalctl --disk-usage || true
 
 print_message "${YELLOW}" "Rotating journal logs..."
-sudo journalctl --rotate
+sudo journalctl --rotate || true
 
 print_message "${YELLOW}" "Cleaning up old journal logs..."
-sudo journalctl --vacuum-time=1d
+sudo journalctl --vacuum-time=1d || true
 
 print_message "${YELLOW}" "Checking disk usage by journal logs after cleanup..."
-sudo journalctl --disk-usage
+sudo journalctl --disk-usage || true
 
 # Uncomment the following lines if you want to use them after reviewing their actions
 # print_message "${YELLOW}" "Trimming filesystem..."
@@ -52,7 +52,7 @@ sudo journalctl --disk-usage
 print_message "${YELLOW}" "Purging residual config packages..."
 residual_packages=$(dpkg -l | grep "^rc" | tr -s ' ' | cut -d ' ' -f 2)
 if [ -n "$residual_packages" ]; then
-  echo "$residual_packages" | xargs sudo dpkg --purge
+  echo "$residual_packages" | xargs sudo dpkg --purge || true
 else
   print_message "${GREEN}" "No residual config packages found."
 fi
@@ -69,38 +69,38 @@ fi
 # Clean /tmp Directory
 # Caution: This will remove all files and directories in /tmp. Ensure no critical operations are using /tmp.
 print_message "${RED}" "Cleaning /tmp directory..."
-sudo rm -rf /tmp/*
+sudo rm -rf /tmp/* || true
 
 # Auto-remove unneeded packages
 print_message "${YELLOW}" "Removing unneeded packages..."
-sudo nala autoremove -y
+sudo nala autoremove -y || true
 
 # Remove unused kernels
 print_message "${YELLOW}" "Removing unused kernels..."
-sudo nala autoremove --purge -y
+sudo nala autoremove --purge -y || true
 
 # Clean Apt cache
 print_message "${YELLOW}" "Cleaning Apt cache..."
-sudo apt-get clean
+sudo apt-get clean || true
 
 # Clean up Docker (if Docker is installed)
 if command -v docker &> /dev/null; then
   print_message "${YELLOW}" "Cleaning up Docker..."
-  docker system prune -a -f
+  docker system prune -a -f || true
 fi
 
 # Remove old Snap versions (if Snap is used)
 if command -v snap &> /dev/null; then
   print_message "${YELLOW}" "Removing old Snap versions..."
-  sudo snap list --all | awk '/disabled/{print $1, $3}' | while read snapname revision; do sudo snap remove "$snapname" --revision="$revision"; done
+  sudo snap list --all | awk '/disabled/{print $1, $3}' | while read snapname revision; do sudo snap remove "$snapname" --revision="$revision" || true; done
 fi
 
 # Improving power usage using powertop
 print_message "${YELLOW}" "Improving power usage using powertop..."
-sudo powertop --auto-tune
+sudo powertop --auto-tune || true
 
 # Disk space usage after cleanup
 print_message "${YELLOW}" "Disk space usage after cleanup:"
-df -h
+df -h || true
 
 print_message "${GREEN}" "System cleanup process completed!"
