@@ -21,7 +21,7 @@ echo -e "${GREEN}Files are added to the staging area.${NC}"
 echo
 
 # Commit changes
-commit_message="$1 at $(date +%d-%H)"
+commit_message="$1 at $(date --rfc-3339 date)"
 if ! git commit -am "$commit_message"; then
     echo -e "${RED}Error: Unable to commit changes.${NC}"
     exit 1
