@@ -5,11 +5,47 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-# Check the number of arguments
-if [ "$#" -lt 1 ] || [ "$#" -gt 2 ]; then
-    echo -e "${RED}Usage: $0 <commit_message> [tag_name]${NC}"
+# Initialize variables
+tag_name=""
+commit_args=()
+found_t=0
+
+# Parse arguments to find -t flag and extract tag name
+args=("$@")
+for arg in "${args[@]}"; do
+    if [[ $arg == "-t" ]]; then
+        found_t=1
+    else
+        commit_args+=("$arg")
+    fi
+done
+
+# If -t was found, use the last argument as tag name and remove it from commit message
+if [ $found_t -eq 1 ]; then
+    if [ ${#commit_args[@]} -gt 0 ]; then
+        tag_name="${commit_args[-1]}"  # Get last element
+        unset 'commit_args[${#commit_args[@]}-1]'  # Remove last element
+    else
+        echo -e "${RED}Error: No tag name provided after -t flag.${NC}"
+        exit 1
+    fi
+fi
+
+# Check if we have a commit message
+if [ ${#commit_args[@]} -eq 0 ]; then
+    echo -e "${RED}Usage: $0 <commit_message> [-t <tag_name>]${NC}"
+    echo -e "${RED}       If -t is provided, the last argument will be used as tag name.${NC}"
     exit 1
 fi
+
+# Join commit arguments into a single string
+commit_message="${commit_args[*]} at $(date --rfc-3339 date)"
+
+echo -e "${GREEN}Commit message: $commit_message${NC}"
+if [ $found_t -eq 1 ]; then
+    echo -e "${GREEN}Tag name: $tag_name${NC}"
+fi
+echo
 
 # Add changes to the staging area
 if ! git add .; then
@@ -21,7 +57,6 @@ echo -e "${GREEN}Files are added to the staging area.${NC}"
 echo
 
 # Commit changes
-commit_message="$1 at $(date --rfc-3339 date)"
 if ! git commit -am "$commit_message"; then
     echo -e "${RED}Error: Unable to commit changes.${NC}"
     exit 1
@@ -29,7 +64,7 @@ fi
 
 echo -e "${GREEN}Files are committed with the message: $commit_message${NC}"
 
-
+# Push changes
 if ! git push ; then 
     echo -e "${RED}Error: Unable to Push.${NC}"
     exit 1    
@@ -37,12 +72,11 @@ fi
 
 echo -e "${GREEN}Changes pushed successfully.${NC}"
 
-
-# Tagging (if two arguments provided)
-if [ "$#" -eq 2 ]; then
-    if git tag "$2"; then
-        echo -e "${GREEN}Tag $2 created.${NC}"
-        # Push the commit (already pushed above), then push the tag
+# Tagging (if -t flag was provided)
+if [ $found_t -eq 1 ]; then
+    if git tag "$tag_name"; then
+        echo -e "${GREEN}Tag $tag_name created.${NC}"
+        # Push the tag
         if git push --tags; then
             echo -e "${GREEN}Tag pushed successfully.${NC}"
         else
@@ -50,8 +84,7 @@ if [ "$#" -eq 2 ]; then
             exit 1
         fi
     else
-        echo -e "${RED}Error: Unable to create tag $2.${NC}"
+        echo -e "${RED}Error: Unable to create tag $tag_name.${NC}"
         exit 1
     fi
 fi
-
