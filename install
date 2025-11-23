@@ -21,7 +21,7 @@ else
 fi
 
 
-
+#  add dir to path
 exists=$(echo "$PATH" | tr ':' '\n' | grep "$scripts_path")
 if [ -z "$exists" ]; then
     echo "export PATH=""$PATH":"$scripts_path""" >> "$HOME/$rc_file"
@@ -32,7 +32,7 @@ fi
 
 
 # Handle '*' argument to install all scripts in the folder
-if [[ "$script_name" == * ]]; then
+if [[ "$script_name" == "*" ]]; then
     for file in $(ls -1 | grep -v install); do
 
         # Only link regular files, skip directories and install script itself
