@@ -33,11 +33,16 @@ fi
 
 # Handle '*' argument to install all scripts in the folder
 if [[ "$script_name" == "*" ]]; then
-    for file in $(ls -1 | grep -v install); do
+    shopt -s nullglob
+    for file in *; do
+        # Skip the install script itself
+        if [[ "$file" == "install" ]]; then
+            continue
+        fi
 
-        # Only link regular files, skip directories and install script itself
+        # Only link regular files, skip directories and non-regular files
         if [[ -f "$file" ]]; then
-            ln -f "$file" "$scripts_path"
+            ln -f -- "$file" "$scripts_path"
             if [[ $? -eq 0 ]]; then
                 echo -e "${GREEN}Linked $file to $scripts_path${NC}"
             else
@@ -45,8 +50,9 @@ if [[ "$script_name" == "*" ]]; then
             fi
         fi
     done
+    shopt -u nullglob
 else
-    ln -f "$script_name" "$scripts_path"
+    ln -f -- "$script_name" "$scripts_path"
     if [[ $? -eq 0 ]]; then
         echo -e "${GREEN}Linked $script_name to $scripts_path${NC}"
     else
