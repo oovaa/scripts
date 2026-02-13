@@ -60,11 +60,11 @@ fi
 # Uncomment the following lines if you want to use them after reviewing their actions
 # print_message "${YELLOW}" "Removing orphaned packages with deborphan..."
 # orphaned_packages=$(sudo deborphan)
-# if [ -n "$orphaned_packages" ]; then
-#   echo "$orphaned_packages" | xargs sudo apt-get -y remove --purge
-# else
-#   print_message "${GREEN}" "No orphaned packages found."
-# fi
+if [ -n "$orphaned_packages" ]; then
+  echo "$orphaned_packages" | xargs sudo apt-get -y remove --purge
+else
+  print_message "${GREEN}" "No orphaned packages found."
+fi
 
 # Clean /tmp Directory
 # Caution: This will remove all files and directories in /tmp. Ensure no critical operations are using /tmp.
