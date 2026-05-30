@@ -31,15 +31,21 @@ if [ $found_t -eq 1 ]; then
     fi
 fi
 
-# Check if we have a commit message
+# If no commit message provided, prompt interactively
 if [ ${#commit_args[@]} -eq 0 ]; then
-    echo -e "${RED}Usage: $0 <commit_message> [-t <tag_name>]${NC}"
-    echo -e "${RED}       If -t is provided, the last argument will be used as tag name.${NC}"
-    exit 1
+    echo -e "${GREEN}Changes to be committed:${NC}"
+    git status --short
+    echo
+    read -rp "Enter commit message: " user_message
+    if [[ -z "$user_message" ]]; then
+        echo -e "${RED}Error: Commit message cannot be empty.${NC}"
+        exit 1
+    fi
+    commit_args=("$user_message")
 fi
 
 # Join commit arguments into a single string
-commit_message="${commit_args[*]} at $(date --rfc-3339 date)"
+commit_message="${commit_args[*]}"
 
 echo -e "${GREEN}Commit message: $commit_message${NC}"
 if [ $found_t -eq 1 ]; then

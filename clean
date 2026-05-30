@@ -5,102 +5,315 @@
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+NC='\033[0m'
 
-# Log output
-LOG_FILE="/var/log/system_cleanup.log"
-exec > >(tee -i ${LOG_FILE}) 2>&1
+DRY_RUN=false
+STATS=()
+TOTAL_FREED=0
 
-# Function to print messages with color
+# Parse arguments
+for arg in "$@"; do
+  case $arg in
+    --dry-run) DRY_RUN=true ;;
+  esac
+done
+
 print_message() {
-  color=$1
-  message=$2
+  local color=$1
+  local message=$2
   echo -e "${color}${message}${NC}"
 }
 
+get_size_mb() {
+  local path="$1"
+  if [[ -e "$path" ]]; then
+    du -sm "$path" 2>/dev/null | awk '{print $1}'
+  else
+    echo 0
+  fi
+}
+
+get_size_human() {
+  local mb=$1
+  if (( mb >= 1024 )); then
+    echo "$(echo "scale=1; $mb/1024" | bc)GB"
+  else
+    echo "${mb}MB"
+  fi
+}
+
+track_freed() {
+  local category=$1
+  local before=$2
+  local after=$3
+  local freed=$(( before - after ))
+  if (( freed < 0 )); then freed=0; fi
+  STATS+=("$category|$before|$after|$freed")
+  TOTAL_FREED=$(( TOTAL_FREED + freed ))
+}
+
+run_or_dry() {
+  if $DRY_RUN; then
+    print_message "${CYAN}" "[DRY RUN] Would execute: $1"
+    return 0
+  fi
+  eval "$1"
+}
+
+# --- Cleaning Functions ---
+
+clean_packages() {
+  print_message "${YELLOW}" "=== Package Cache ==="
+  local before=$(du -sm /var/cache/apt 2>/dev/null | awk '{print $1}')
+  before=${before:-0}
+
+  if $DRY_RUN; then
+    print_message "${CYAN}" "[DRY RUN] Would clean apt cache (~$(get_size_human $before))"
+  else
+    sudo nala clean || sudo apt-get clean || true
+  fi
+
+  local after=$(du -sm /var/cache/apt 2>/dev/null | awk '{print $1}')
+  after=${after:-0}
+  track_freed "Package cache" "$before" "$after"
+}
+
+clean_journal_logs() {
+  print_message "${YELLOW}" "=== Journal Logs ==="
+  local before=$(sudo journalctl --disk-usage 2>/dev/null | grep -oP '[\d.]+[GMK]' | head -1)
+  local before_mb=0
+  if [[ "$before" =~ ([0-9.]+)([GMK]) ]]; then
+    local val=${BASH_REMATCH[1]}
+    local unit=${BASH_REMATCH[2]}
+    case $unit in
+      G) before_mb=$(echo "$val * 1024" | bc | cut -d. -f1) ;;
+      M) before_mb=$(echo "$val" | cut -d. -f1) ;;
+      K) before_mb=$(echo "$val / 1024" | bc | cut -d. -f1) ;;
+    esac
+  fi
+
+  run_or_dry "sudo journalctl --rotate"
+  run_or_dry "sudo journalctl --vacuum-time=1d"
+
+  local after=$(sudo journalctl --disk-usage 2>/dev/null | grep -oP '[\d.]+[GMK]' | head -1)
+  local after_mb=0
+  if [[ "$after" =~ ([0-9.]+)([GMK]) ]]; then
+    local val=${BASH_REMATCH[1]}
+    local unit=${BASH_REMATCH[2]}
+    case $unit in
+      G) after_mb=$(echo "$val * 1024" | bc | cut -d. -f1) ;;
+      M) after_mb=$(echo "$val" | cut -d. -f1) ;;
+      K) after_mb=$(echo "$val / 1024" | bc | cut -d. -f1) ;;
+    esac
+  fi
+
+  track_freed "Journal logs" "$before_mb" "$after_mb"
+}
+
+clean_residual_packages() {
+  print_message "${YELLOW}" "=== Residual Packages ==="
+  local residual_packages=$(dpkg -l | grep "^rc" | tr -s ' ' | cut -d ' ' -f 2)
+  if [[ -n "$residual_packages" ]]; then
+    local count=$(echo "$residual_packages" | wc -l)
+    if $DRY_RUN; then
+      print_message "${CYAN}" "[DRY RUN] Would purge $count residual config packages"
+    else
+      echo "$residual_packages" | xargs sudo dpkg --purge || true
+    fi
+  else
+    print_message "${GREEN}" "No residual config packages found."
+  fi
+  track_freed "Residual packages" 0 0
+}
+
+clean_user_caches() {
+  print_message "${YELLOW}" "=== User Caches ==="
+  local cache_dir="$HOME/.cache"
+  local before=$(get_size_mb "$cache_dir")
+
+  if $DRY_RUN; then
+    print_message "${CYAN}" "[DRY RUN] Would clean ~/.cache (~$(get_size_human $before))"
+  else
+    # Safe cleanup: only target known safe cache dirs
+    rm -rf "$cache_dir"/thumbnail-cache/* 2>/dev/null
+    rm -rf "$cache_dir"/fontconfig/* 2>/dev/null
+    rm -rf "$cache_dir"/mozilla/*/Cache/* 2>/dev/null
+    rm -rf "$cache_dir"/chromium/*/Cache/* 2>/dev/null
+    rm -rf "$cache_dir"/google-chrome/*/Cache/* 2>/dev/null
+    rm -rf "$cache_dir"/pip/http/* 2>/dev/null
+    rm -rf "$cache_dir"/npm/_cacache/* 2>/dev/null
+    rm -rf "$cache_dir"/yarn/* 2>/dev/null
+    rm -rf "$cache"/bun/* 2>/dev/null
+    rm -rf "$cache_dir"/uv/* 2>/dev/null
+    rm -rf "$cache_dir"/nix/* 2>/dev/null
+    rm -rf "$cache_dir"/Trash/* 2>/dev/null
+  fi
+
+  local after=$(get_size_mb "$cache_dir")
+  track_freed "User caches" "$before" "$after"
+}
+
+clean_old_logs() {
+  print_message "${YELLOW}" "=== Old Log Files ==="
+  local before=$(du -sm /var/log 2>/dev/null | awk '{print $1}')
+  before=${before:-0}
+
+  if $DRY_RUN; then
+    print_message "${CYAN}" "[DRY RUN] Would clean /var/log rotated files (~$(get_size_human $before))"
+  else
+    sudo find /var/log -name "*.gz" -delete 2>/dev/null
+    sudo find /var/log -name "*.old" -delete 2>/dev/null
+    sudo find /var/log -name "*.[0-9]" -delete 2>/dev/null
+    sudo truncate -s 0 /var/log/syslog 2>/dev/null
+    sudo truncate -s 0 /var/log/kern.log 2>/dev/null
+    sudo truncate -s 0 /var/log/auth.log 2>/dev/null
+  fi
+
+  local after=$(du -sm /var/log 2>/dev/null | awk '{print $1}')
+  after=${after:-0}
+  track_freed "Old logs" "$before" "$after"
+}
+
+clean_trash_temp() {
+  print_message "${YELLOW}" "=== Trash & Temp Files ==="
+  local trash_dir="$HOME/.local/share/Trash"
+  local trash_size=$(get_size_mb "$trash_dir")
+  local tmp_size=$(du -sm /tmp 2>/dev/null | awk '{print $1}')
+  local var_tmp_size=$(du -sm /var/tmp 2>/dev/null | awk '{print $1}')
+  local before=$(( trash_size + tmp_size + var_tmp_size ))
+
+  if $DRY_RUN; then
+    print_message "${CYAN}" "[DRY RUN] Would empty trash (~$(get_size_human $trash_size)) and clean /tmp, /var/tmp"
+  else
+    rm -rf "$trash_dir"/files/* "$trash_dir"/info/* 2>/dev/null
+    sudo rm -rf /tmp/* 2>/dev/null
+    sudo rm -rf /var/tmp/* 2>/dev/null
+  fi
+
+  local trash_after=$(get_size_mb "$trash_dir")
+  local tmp_after=$(du -sm /tmp 2>/dev/null | awk '{print $1}')
+  local var_tmp_after=$(du -sm /var/tmp 2>/dev/null | awk '{print $1}')
+  local after=$(( trash_after + tmp_after + var_tmp_after ))
+  track_freed "Trash & temp" "$before" "$after"
+}
+
+clean_docker() {
+  if ! command -v docker &> /dev/null; then return; fi
+  print_message "${YELLOW}" "=== Docker ==="
+  local before=$(docker system df 2>/dev/null | awk 'NR>1{sum += $4} END {print sum+0}')
+
+  if $DRY_RUN; then
+    print_message "${CYAN}" "[DRY RUN] Would prune Docker (~${before}MB reclaimable)"
+  else
+    docker system prune -a -f || true
+  fi
+
+  local after=$(docker system df 2>/dev/null | awk 'NR>1{sum += $4} END {print sum+0}')
+  track_freed "Docker" "$before" "$after"
+}
+
+clean_snap() {
+  if ! command -v snap &> /dev/null; then return; fi
+  print_message "${YELLOW}" "=== Snap ==="
+  local removed=0
+
+  snap_list=$(sudo snap list --all 2>/dev/null | awk '/disabled/{print $1, $3}')
+  if [[ -n "$snap_list" ]]; then
+    if $DRY_RUN; then
+      local count=$(echo "$snap_list" | wc -l)
+      print_message "${CYAN}" "[DRY RUN] Would remove $count old snap revisions"
+    else
+      echo "$snap_list" | while read snapname revision; do
+        sudo snap remove "$snapname" --revision="$revision" || true
+      done
+    fi
+  else
+    print_message "${GREEN}" "No old snap versions found."
+  fi
+  track_freed "Snap" 0 0
+}
+
+clean_orphans() {
+  print_message "${YELLOW}" "=== Orphaned Packages ==="
+  if $DRY_RUN; then
+    print_message "${CYAN}" "[DRY RUN] Would autoremove and purge unused packages"
+  else
+    sudo nala autoremove -y || sudo apt-get autoremove -y || true
+    sudo nala autoremove --purge -y || sudo apt-get autoremove --purge -y || true
+  fi
+  track_freed "Orphans" 0 0
+}
+
+optimize_powertop() {
+  if ! command -v powertop &> /dev/null; then return; fi
+  print_message "${YELLOW}" "=== Power Optimization ==="
+  if $DRY_RUN; then
+    print_message "${CYAN}" "[DRY RUN] Would run powertop --auto-tune"
+  else
+    sudo powertop --auto-tune || true
+  fi
+}
+
+# --- Summary ---
+
+print_summary() {
+  echo ""
+  print_message "${BOLD}${CYAN}" "========================================"
+  print_message "${BOLD}${CYAN}" "         CLEANUP SUMMARY"
+  print_message "${BOLD}${CYAN}" "========================================"
+  printf "%-22s %10s %10s %10s\n" "Category" "Before" "After" "Freed"
+  print_message "${CYAN}" "----------------------------------------------------"
+
+  for stat in "${STATS[@]}"; do
+    IFS='|' read -r cat before after freed <<< "$stat"
+    if (( freed > 0 )); then
+      printf "%-22s %10s %10s ${GREEN}%10s${NC}\n" \
+        "$cat" "$(get_size_human $before)" "$(get_size_human $after)" "$(get_size_human $freed)"
+    else
+      printf "%-22s %10s %10s %10s\n" \
+        "$cat" "$(get_size_human $before)" "$(get_size_human $after)" "-"
+    fi
+  done
+
+  print_message "${CYAN}" "===================================================="
+  print_message "${BOLD}${GREEN}" "Total freed: $(get_size_human $TOTAL_FREED)"
+  print_message "${CYAN}" "========================================"
+}
+
+# --- Main ---
+
+echo ""
+if $DRY_RUN; then
+  print_message "${BOLD}${CYAN}" "DRY RUN MODE - Nothing will be deleted"
+  echo ""
+fi
+
 print_message "${GREEN}" "Starting system cleanup process..."
+echo ""
 
-# Disk space usage before cleanup
-print_message "${YELLOW}" "Disk space usage before cleanup:"
-df -h || true
+print_message "${YELLOW}" "Disk usage before cleanup:"
+df -h / | tail -1
+echo ""
 
-# Update package lists and upgrade installed packages
-# print_message "${YELLOW}" "Updating package lists and upgrading installed packages..."
-# sudo nala update && sudo nala upgrade -y
+clean_packages
+clean_journal_logs
+clean_residual_packages
+clean_user_caches
+clean_old_logs
+clean_trash_temp
+clean_docker
+clean_snap
+clean_orphans
+optimize_powertop
 
-# Clean package cache
-print_message "${YELLOW}" "Cleaning package cache..."
-sudo nala clean || true
+echo ""
+print_message "${YELLOW}" "Disk usage after cleanup:"
+df -h / | tail -1
+echo ""
 
-# Managing System Logs
-print_message "${YELLOW}" "Checking current disk usage by journal logs..."
-sudo journalctl --disk-usage || true
+print_summary
 
-print_message "${YELLOW}" "Rotating journal logs..."
-sudo journalctl --rotate || true
-
-print_message "${YELLOW}" "Cleaning up old journal logs..."
-sudo journalctl --vacuum-time=1d || true
-
-print_message "${YELLOW}" "Checking disk usage by journal logs after cleanup..."
-sudo journalctl --disk-usage || true
-
-# Uncomment the following lines if you want to use them after reviewing their actions
-# print_message "${YELLOW}" "Trimming filesystem..."
-# sudo fstrim -va
-
-print_message "${YELLOW}" "Purging residual config packages..."
-residual_packages=$(dpkg -l | grep "^rc" | tr -s ' ' | cut -d ' ' -f 2)
-if [ -n "$residual_packages" ]; then
-  echo "$residual_packages" | xargs sudo dpkg --purge || true
-else
-  print_message "${GREEN}" "No residual config packages found."
-fi
-
-# Uncomment the following lines if you want to use them after reviewing their actions
-# print_message "${YELLOW}" "Removing orphaned packages with deborphan..."
-# orphaned_packages=$(sudo deborphan)
-if [ -n "$orphaned_packages" ]; then
-  echo "$orphaned_packages" | xargs sudo apt-get -y remove --purge
-else
-  print_message "${GREEN}" "No orphaned packages found."
-fi
-
-# Clean /tmp Directory
-# Caution: This will remove all files and directories in /tmp. Ensure no critical operations are using /tmp.
-print_message "${RED}" "Cleaning /tmp directory..."
-sudo rm -rf /tmp/* || true
-
-# Auto-remove unneeded packages
-print_message "${YELLOW}" "Removing unneeded packages..."
-sudo nala autoremove -y || true
-
-# Remove unused kernels
-print_message "${YELLOW}" "Removing unused kernels..."
-sudo nala autoremove --purge -y || true
-
-# Clean Apt cache
-print_message "${YELLOW}" "Cleaning Apt cache..."
-sudo apt-get clean || true
-
-# Clean up Docker (if Docker is installed)
-if command -v docker &> /dev/null; then
-  print_message "${YELLOW}" "Cleaning up Docker..."
-  docker system prune -a -f || true
-fi
-
-# Remove old Snap versions (if Snap is used)
-if command -v snap &> /dev/null; then
-  print_message "${YELLOW}" "Removing old Snap versions..."
-  sudo snap list --all | awk '/disabled/{print $1, $3}' | while read snapname revision; do sudo snap remove "$snapname" --revision="$revision" || true; done
-fi
-
-# Improving power usage using powertop
-print_message "${YELLOW}" "Improving power usage using powertop..."
-sudo powertop --auto-tune || true
-
-# Disk space usage after cleanup
-print_message "${YELLOW}" "Disk space usage after cleanup:"
-df -h || true
-
+echo ""
 print_message "${GREEN}" "System cleanup process completed!"
