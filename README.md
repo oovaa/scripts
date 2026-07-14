@@ -32,9 +32,10 @@ By default shows the Daily section only (today). `-w` shows a weekly view (per-d
 
 ## Requirements
 
-- Python 3.10+ (uses [`rich`](https://github.com/Textualize/rich) for the table)
+- Python 3.10+ and [`uv`](https://github.com/astral-sh/uv) on your `PATH` (used to run the script)
 - `vnstat`
-- Install the dependency with: `uv pip install --system rich`  (or `pip install rich`)
+
+No manual install of `rich`: the script carries inline PEP 723 metadata, and its shebang runs it via `uv run --script`, which provisions `rich` into an ephemeral environment automatically on first run. Just run `./netty` (or `uv run netty`).
 
 For each script, additional requirements may apply (e.g., Git, nmcli, npm, pip)
 
