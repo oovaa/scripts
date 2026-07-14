@@ -23,18 +23,18 @@ no manual padding, no drift.
 
 ### About `rich`
 
-You do **not** install `rich` yourself. The script carries inline
-[PEP 723](https://peps.python.org/pep-0723/) metadata, and its shebang runs it
-as:
+You do **not** need to install `rich` by hand. On first run, `netty` notices
+`rich` is missing and installs it into your **user** site
+(`uv pip install --user --python <this-python> rich`, falling back to
+`python3 -m pip install --user rich`) — a one-time, non-interactive step that
+does not touch your system Python (handy on Homebrew/externally-managed
+Pythons where `pip install --system` is blocked). After that, `netty` runs
+under plain `python3` and starts instantly.
 
-```text
-#!/usr/bin/env -S uv run --script
-```
-
-The first time you run `netty`, `uv` provisions `rich` into an **ephemeral
-environment** automatically. Subsequent runs reuse that cached environment, so
-startup stays fast. This avoids touching your system Python (handy on
-Homebrew/externally-managed Pythons where `pip install --system` is blocked).
+The script carries inline [PEP 723](https://peps.python.org/pep-0723/) metadata
+for documentation, but it does **not** run via `uv run` at runtime — doing so
+left the terminal open on some setups (the process wouldn't return to the shell
+without Ctrl-D). The user-site install + plain `python3` shebang avoids that.
 
 ---
 
@@ -188,4 +188,5 @@ netty -i wlp2s0 -w
 - **Alignment is delegated to `rich`.** Because `rich` measures display width
   (including wide glyphs), the columns stay aligned without hand-rolled padding.
 - The script is a single self-contained file; the only runtime dependency
-  (`rich`) is auto-managed by `uv` via the inline metadata.
+  (`rich`) is auto-installed into the current interpreter's user site on first
+  run, then runs under plain `python3`.

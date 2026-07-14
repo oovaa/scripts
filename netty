@@ -1,4 +1,4 @@
-#!/usr/bin/env -S uv run --script
+#!/usr/bin/env python3
 # /// script
 # dependencies = ["rich"]
 # ///
@@ -12,10 +12,41 @@
 #   -d         daily only (today)  [default]
 #   -m         monthly only
 #   (default shows the Daily section only)
+import os
 import re
 import subprocess
 import sys
 from datetime import datetime, date, timedelta
+
+
+def _bootstrap():
+    """Ensure `rich` is importable. If missing, install it into the *current*
+    interpreter's user site (one-time, non-interactive) and re-exec plain
+    python3. We deliberately avoid `uv run` at runtime: on some setups it keeps
+    the TTY open and the process never returns to the shell without Ctrl-D."""
+    try:
+        import rich  # noqa: F401
+        return
+    except ImportError:
+        pass
+    py = sys.executable
+    done = False
+    for cmd in (
+        ["uv", "pip", "install", "--user", "--python", py, "rich"],
+        [py, "-m", "pip", "install", "--user", "rich"],
+    ):
+        try:
+            if subprocess.run(cmd, stdin=subprocess.DEVNULL).returncode == 0:
+                done = True
+                break
+        except FileNotFoundError:
+            continue
+    if not done:
+        sys.exit("error: install rich with `uv pip install --user rich` (or `pip install --user rich`)")
+    os.execv(py, [py, os.path.realpath(__file__), *sys.argv[1:]])
+
+
+_bootstrap()
 
 from rich.console import Console
 from rich.panel import Panel
@@ -36,7 +67,9 @@ console = Console()
 
 
 def run(args):
-    return subprocess.run(["vnstat", *args], capture_output=True, text=True).stdout
+    return subprocess.run(
+        ["vnstat", *args], capture_output=True, text=True, stdin=subprocess.DEVNULL
+    ).stdout
 
 
 def human(b):
