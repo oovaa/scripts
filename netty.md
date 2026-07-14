@@ -19,22 +19,28 @@ no manual padding, no drift.
 |-------------|-------|
 | `vnstat`    | The traffic logger must be installed and recording. `netty` reads its database via the `vnstat` CLI. |
 | Python 3.10+| Any reasonably modern CPython. |
-| `uv`        | Used to **run** the script. Must be on your `PATH`. Install from <https://github.com/astral-sh/uv> (or `brew install uv`). |
+| `uv`        | Optional, but preferred: used to create the venv and install `rich` on first run. Falls back to `python3 -m venv` if absent. |
 
 ### About `rich`
 
-You do **not** need to install `rich` by hand. On first run, `netty` notices
-`rich` is missing and installs it into your **user** site
-(`uv pip install --user --python <this-python> rich`, falling back to
-`python3 -m pip install --user rich`) — a one-time, non-interactive step that
-does not touch your system Python (handy on Homebrew/externally-managed
-Pythons where `pip install --system` is blocked). After that, `netty` runs
-under plain `python3` and starts instantly.
+You do **not** install `rich` by hand. Homebrew / externally-managed Pythons
+forbid both system-wide and `--user` installs, so on first run `netty` creates
+a small virtual environment at `~/.local/share/netty/venv`, installs `rich`
+into it (via `uv` or `python3 -m venv` + `pip`), and re-execs that venv's
+`python3`. This is a one-time, non-interactive step that leaves your system
+Python untouched. After that, `netty` starts instantly via the venv.
+
+To pre-provision it yourself (optional):
+
+```bash
+uv venv ~/.local/share/netty/venv
+uv pip install --python ~/.local/share/netty/venv/bin/python rich
+```
 
 The script carries inline [PEP 723](https://peps.python.org/pep-0723/) metadata
 for documentation, but it does **not** run via `uv run` at runtime — doing so
 left the terminal open on some setups (the process wouldn't return to the shell
-without Ctrl-D). The user-site install + plain `python3` shebang avoids that.
+without Ctrl-D). The venv + plain `python3` shebang avoids that.
 
 ---
 
@@ -188,5 +194,5 @@ netty -i wlp2s0 -w
 - **Alignment is delegated to `rich`.** Because `rich` measures display width
   (including wide glyphs), the columns stay aligned without hand-rolled padding.
 - The script is a single self-contained file; the only runtime dependency
-  (`rich`) is auto-installed into the current interpreter's user site on first
-  run, then runs under plain `python3`.
+  (`rich`) is auto-installed into a venv at `~/.local/share/netty/venv` on
+  first run, then runs under that venv's `python3`.

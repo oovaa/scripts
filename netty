@@ -20,29 +20,40 @@ from datetime import datetime, date, timedelta
 
 
 def _bootstrap():
-    """Ensure `rich` is importable. If missing, install it into the *current*
-    interpreter's user site (one-time, non-interactive) and re-exec plain
-    python3. We deliberately avoid `uv run` at runtime: on some setups it keeps
-    the TTY open and the process never returns to the shell without Ctrl-D."""
+    """Ensure `rich` is available. Homebrew/externally-managed Pythons forbid
+    user/system installs, so on first run we create a venv under
+    ~/.local/share/netty/venv, install `rich` into it, and re-exec that venv's
+    python. Plain `python3` shebang + venv keeps the TTY clean (no `uv run`)."""
+    venv = os.path.join(os.path.expanduser("~"), ".local", "share", "netty", "venv")
+    py = os.path.join(venv, "bin", "python3")
+    if sys.executable == py:
+        return  # already the venv python; rich must be present
+    if os.path.exists(py):
+        os.execv(py, [py, os.path.realpath(__file__), *sys.argv[1:]])
     try:
         import rich  # noqa: F401
         return
     except ImportError:
         pass
-    py = sys.executable
-    done = False
-    for cmd in (
-        ["uv", "pip", "install", "--user", "--python", py, "rich"],
-        [py, "-m", "pip", "install", "--user", "rich"],
-    ):
+    for mk in (["uv", "venv", venv], [sys.executable, "-m", "venv", venv]):
         try:
-            if subprocess.run(cmd, stdin=subprocess.DEVNULL).returncode == 0:
-                done = True
+            if subprocess.run(mk, stdin=subprocess.DEVNULL).returncode == 0:
                 break
         except FileNotFoundError:
             continue
-    if not done:
-        sys.exit("error: install rich with `uv pip install --user rich` (or `pip install --user rich`)")
+    else:
+        sys.exit("error: could not create venv (need `uv` or `python3 -m venv`)")
+    for inst in (
+        ["uv", "pip", "install", "--python", py, "rich"],
+        [py, "-m", "pip", "install", "rich"],
+    ):
+        try:
+            if subprocess.run(inst, stdin=subprocess.DEVNULL).returncode == 0:
+                break
+        except FileNotFoundError:
+            continue
+    else:
+        sys.exit("error: could not install `rich` into the venv")
     os.execv(py, [py, os.path.realpath(__file__), *sys.argv[1:]])
 
 
