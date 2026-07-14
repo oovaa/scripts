@@ -24,7 +24,7 @@ Usage: `./uniupdate`
 
 ### [netty](netty)
 
-Renders `vnstat` traffic statistics (daily + monthly) as a clean, colored bar chart with download/upload split. No estimates, no weekly view (removed in vnStat 2.x). Installs `vnstat`/`jq` if missing.
+Renders `vnstat` traffic statistics (daily + monthly) as a clean, colored bar chart with download/upload split. Parses vnStat's textual output (no JSON/jq needed), so it works across vnStat versions. No estimates shown. Installs `vnstat` if missing.
 
 Usage: `./netty [-i interface] [-w [N]] [-m]`
 
