@@ -2,22 +2,26 @@
 # netty — render vnStat traffic stats as a clean, colored bar chart.
 # No estimates, no weekly flag (removed in vnStat 2.x). Requires vnstat + jq.
 #
-# Usage: netty [-i iface] [-w] [-d|-m]
+# Usage: netty [-i iface] [-w [N]] [-d|-m]
 #   -i iface   select interface (default: first in database)
-#   -w         daily = last 8 days (today back to same weekday last week)
-#   -d         daily only (today, or week with -w)  [default]
+#   -w [N]     weekly view: a week summary bar with per-day detail underneath.
+#              N=1 (default) = most recent 7 days, N=2 = the week before, etc.
+#   -d         daily only (today)  [default]
 #   -m         monthly only
-#   (default shows the daily section only)
+#   (default shows the Daily section only)
 set -euo pipefail
 
 iface=""
 week=0
+wnum=1
 show_daily=1
 show_monthly=0
 while [ $# -gt 0 ]; do
   case "$1" in
     -i) iface="$2"; shift 2 ;;
-    -w) week=1; shift ;;
+    -w) week=1
+        if [[ "${2:-}" =~ ^[0-9]+$ ]]; then wnum=$2; shift; fi
+        shift ;;
     -d) show_daily=1; show_monthly=0; shift ;;
     -m) show_daily=0; show_monthly=1; shift ;;
     -h|--help) sed -n '2,12p' "$0"; exit 0 ;;
@@ -106,13 +110,56 @@ draw_section() {
   echo
 }
 
-slice=$(( week ? 8 : 1 ))
-mapfile -t days < <(jq -r --argjson n "$slice" '.interfaces[0].traffic.days // [] | reverse | .[0:$n] | .[] |
+# Weekly view: one week summary bar on top, per-day detail underneath.
+# wnum=1 -> most recent 7 days, 2 -> the week before that, etc.
+draw_week() {
+  local wn=$1
+  local n=${#all_days[@]}
+  local start=$(( n - 7 * wn ))
+  [ "$start" -lt 0 ] && start=0
+  local len=7; [ $(( start + len )) -gt "$n" ] && len=$(( n - start ))
+  local entries=("${all_days[@]:start:len}")
+  [ ${#entries[@]} -eq 0 ] && { printf "${C_DIM}  no data for week %s${RST}\n\n" "$wn"; return; }
+  local wtot=0 tot first=${entries[0]} last=${entries[-1]}
+  for e in "${entries[@]}"; do tot=${e#*|}; tot=${tot%%|*}; wtot=$(( wtot + tot )); done
+  printf "${BOLD}${C_HEAD}  Week %s · %s – %s${RST}  ${C_TOT}%s${RST}\n" \
+    "$wn" "${first##*|}" "${last##*|}" "$(human "$wtot")"
+  printf "  ${C_TOT}%s${RST}\n" "$(printf '%-*s' "$barw" "$BAR")"
+  # detail, most recent day first
+  local rev=()
+  for ((i = ${#entries[@]} - 1; i >= 0; i--)); do rev+=("${entries[i]}"); done
+  local rx tx tot label rl tl rest
+  for e in "${rev[@]}"; do
+    rx=${e%%|*}; rest=${e#*|}; tx=${rest%%|*}; rest=${rest#*|}; tot=${rest%%|*}; label=${rest#*|}
+    if [ "$wtot" -gt 0 ]; then
+      rl=$(awk -v x="$rx" -v m="$wtot" -v w="$barw" 'BEGIN{printf "%d", x/m*w+0.5}')
+      tl=$(awk -v x="$tx" -v m="$wtot" -v w="$barw" 'BEGIN{printf "%d", x/m*w+0.5}')
+    else rl=0; tl=0; fi
+    printf "  ${C_DIM}%-12s${RST} ${C_DOWN}%s${RST}${C_UP}%s${RST} %s\n" \
+      "$label" "$(printf '%-*s' "$rl" "$BAR")" "$(printf '%-*s' "$tl" "$BAR")" "$(human "$tot")"
+  done
+  echo
+}
+
+# all_days: ascending by date ("rx|tx|total|YYYY-MM-DD")
+mapfile -t all_days < <(jq -r '.interfaces[0].traffic.days // [] | .[] |
   "\(.rx)|\(.tx)|\(.rx+.tx)|\(.date.year)-\(.date.month|tostring|if length==1 then "0"+. else . end)-\(.date.day|tostring|if length==1 then "0"+. else . end)"' <<<"$days_json")
 mapfile -t months < <(jq -r '.interfaces[0].traffic.months // [] | .[] |
   "\(.rx)|\(.tx)|\(.rx+.tx)|\(.date.year)-\(.date.month|tostring|if length==1 then "0"+. else . end)"' <<<"$months_json")
 
-[ "$show_daily" -eq 1 ] && draw_section "Daily" "${days[@]}"
-[ "$show_monthly" -eq 1 ] && draw_section "Monthly" "${months[@]}"
+if [ "$week" -eq 1 ]; then
+  draw_week "$wnum"
+else
+  if [ "$show_daily" -eq 1 ]; then
+    slice=$(( 1 ))   # today only
+    n=${#all_days[@]}; take=$slice
+    daily_rows=()
+    for ((i = n - take; i < n; i++)); do daily_rows+=("${all_days[i]}"); done
+    rev=()
+    for ((i = ${#daily_rows[@]} - 1; i >= 0; i--)); do rev+=("${daily_rows[i]}"); done
+    draw_section "Daily" "${rev[@]}"
+  fi
+  [ "$show_monthly" -eq 1 ] && draw_section "Monthly" "${months[@]}"
+fi
 
 printf "${C_DIM}  ↓ download   ${C_UP}%s${RST} ${C_DIM}↑ upload${RST}\n" "$BAR"
