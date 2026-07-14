@@ -19,30 +19,53 @@ import sys
 from datetime import datetime, date, timedelta
 
 
+def _find_venv_python(venv):
+    bindir = os.path.join(venv, "bin")
+    if not os.path.isdir(bindir):
+        return None
+    for name in ("python3", "python"):
+        p = os.path.join(bindir, name)
+        if os.path.isfile(p) and os.access(p, os.X_OK):
+            return p
+    cands = []
+    for n in os.listdir(bindir):
+        if re.fullmatch(r"python\d+(\.\d+)?", n) and os.access(os.path.join(bindir, n), os.X_OK):
+            cands.append(n)
+    if cands:
+        return os.path.join(bindir, sorted(cands, reverse=True)[0])
+    return None
+
+
 def _bootstrap():
     """Ensure `rich` is available. Homebrew/externally-managed Pythons forbid
-    user/system installs, so on first run we create a venv under
-    ~/.local/share/netty/venv, install `rich` into it, and re-exec that venv's
-    python. Plain `python3` shebang + venv keeps the TTY clean (no `uv run`)."""
+    user/system installs, so we use a venv at ~/.local/share/netty/venv.
+    A marker file marks it as ready so we don't re-download on every run
+    (Homebrew's `uv venv` creates `bin/python3.X` but NOT `bin/python3`,
+    which broke a previous hardcoded lookup)."""
     venv = os.path.join(os.path.expanduser("~"), ".local", "share", "netty", "venv")
-    py = os.path.join(venv, "bin", "python3")
-    if sys.executable == py:
-        return  # already the venv python; rich must be present
-    if os.path.exists(py):
+    marker = os.path.join(venv, ".netty-ready")
+    py = _find_venv_python(venv)
+    if py and sys.executable == py:
+        return  # we're already the venv python
+    if py and os.path.exists(marker):
         os.execv(py, [py, os.path.realpath(__file__), *sys.argv[1:]])
     try:
         import rich  # noqa: F401
         return
     except ImportError:
         pass
-    for mk in (["uv", "venv", venv], [sys.executable, "-m", "venv", venv]):
-        try:
-            if subprocess.run(mk, stdin=subprocess.DEVNULL).returncode == 0:
-                break
-        except FileNotFoundError:
-            continue
-    else:
-        sys.exit("error: could not create venv (need `uv` or `python3 -m venv`)")
+    if py is None:
+        for mk in (["uv", "venv", venv], [sys.executable, "-m", "venv", venv]):
+            try:
+                if subprocess.run(mk, stdin=subprocess.DEVNULL).returncode == 0:
+                    break
+            except FileNotFoundError:
+                continue
+        else:
+            sys.exit("error: could not create venv (need `uv` or `python3 -m venv`)")
+        py = _find_venv_python(venv)
+        if py is None:
+            sys.exit("error: venv created but no python binary found inside")
     for inst in (
         ["uv", "pip", "install", "--python", py, "rich"],
         [py, "-m", "pip", "install", "rich"],
@@ -54,6 +77,7 @@ def _bootstrap():
             continue
     else:
         sys.exit("error: could not install `rich` into the venv")
+    open(marker, "w").close()
     os.execv(py, [py, os.path.realpath(__file__), *sys.argv[1:]])
 
 
