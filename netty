@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# vnstatviz — render vnStat traffic stats as a clean, colored bar chart.
+# netty — render vnStat traffic stats as a clean, colored bar chart.
 # No estimates, no weekly flag (removed in vnStat 2.x). Requires vnstat + jq.
 set -euo pipefail
 
