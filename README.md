@@ -24,16 +24,19 @@ Usage: `./uniupdate`
 
 ### [netty](netty)
 
-Renders `vnstat` traffic statistics (daily + monthly) as a clean, colored bar chart with download/upload split. Parses vnStat's textual output (no JSON/jq needed), so it works across vnStat versions. No estimates shown. Installs `vnstat` if missing.
+Renders `vnstat` traffic statistics (daily / weekly / monthly) as a clean, aligned bar chart with download/upload split. Parses vnStat's textual output (no JSON/jq needed), so it works across vnStat versions. No estimates shown.
 
-Usage: `./netty [-i interface] [-w [N]] [-m]`
+Usage: `./netty [-i interface] [-w [N]] [-d|-m]`
 
-By default shows the Daily section only (today). Pass `-w` for a weekly view: a week summary bar with per-day detail underneath. `-w 2` shows the previous week, `-w 3` the one before that (N defaults to 1). `-m` shows the Monthly section instead.
+By default shows the Daily section only (today). `-w` shows a weekly view (per-day rows for the most recent 7 days); `-w 2` shows the previous week, `-w 3` the one before (N defaults to 1). A week with no data prints `no data for week N`. `-m` shows the Monthly section, `-d` the Daily section explicitly.
 
 ## Requirements
 
-- Bash shell
-- For each script, additional requirements may apply (e.g., Git, nmcli, npm, pip)
+- Python 3.10+ (uses [`rich`](https://github.com/Textualize/rich) for the table)
+- `vnstat`
+- Install the dependency with: `uv pip install --system rich`  (or `pip install rich`)
+
+For each script, additional requirements may apply (e.g., Git, nmcli, npm, pip)
 
 ## Notes
 

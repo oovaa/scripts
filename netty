@@ -1,6 +1,6 @@
-#!/usr/bin/env bash
-# netty — render vnStat traffic stats as a clean, bordered bar-chart table.
-# Parses vnStat's textual output (no JSON, no jq needed). No estimates shown.
+#!/usr/bin/env python3
+# netty — render vnStat traffic stats as a clean, aligned bar-chart table.
+# Parses vnStat's textual output (no JSON, no jq). No estimates shown.
 #
 # Usage: netty [-i iface] [-w [N]] [-d|-m]
 #   -i iface   select interface (default: first in database)
@@ -9,177 +9,172 @@
 #   -d         daily only (today)  [default]
 #   -m         monthly only
 #   (default shows the Daily section only)
-set -euo pipefail
+import re
+import subprocess
+import sys
 
-iface=""
-week=0
-wnum=1
-show_daily=1
-show_monthly=0
-while [ $# -gt 0 ]; do
-  case "$1" in
-    -i) iface="$2"; shift 2 ;;
-    -w) week=1
-        if [[ "${2:-}" =~ ^[0-9]+$ ]]; then wnum=$2; shift; fi
-        shift ;;
-    -d) show_daily=1; show_monthly=0; shift ;;
-    -m) show_daily=0; show_monthly=1; shift ;;
-    -h|--help) sed -n '2,15p' "$0"; exit 0 ;;
-    *) echo "unknown arg: $1" >&2; exit 1 ;;
-  esac
-done
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
 
-ensure() {
-  command -v "$1" >/dev/null 2>&1 && return 0
-  echo "$1 not found, installing..." >&2
-  if command -v apt-get >/dev/null; then sudo apt-get update -qq && sudo apt-get install -y "$1"
-  elif command -v pacman >/dev/null; then sudo pacman -S --noconfirm "$1"
-  elif command -v dnf >/dev/null; then sudo dnf install -y "$1"
-  elif command -v brew >/dev/null; then brew install "$1"; fi
-  command -v "$1" >/dev/null 2>&1 || { echo "could not install $1" >&2; exit 1; }
+UNIT = {
+    "B": 1,
+    "KiB": 1024,
+    "MiB": 1024**2,
+    "GiB": 1024**3,
+    "TiB": 1024**4,
+    "PiB": 1024**5,
 }
-ensure vnstat
-: "${TERM:=xterm}"
+VALUE_RE = re.compile(r"(\d+(?:\.\d+)?)\s*(B|KiB|MiB|GiB|TiB|PiB)")
+DATE_RE = re.compile(r"^\s*(\d{4}-\d{2}(?:-\d{2})?)\b")
+BAR_W = 20
+console = Console()
 
-# --- color (disabled when output is not a terminal) ---
-if [ -t 1 ] || [ -n "${FORCE_COLOR:-}" ]; then
-  RST=$(tput sgr0); BOLD=$(tput bold)
-  C_DOWN=$'\033[38;5;46m'; C_UP=$'\033[38;5;214m'
-  C_DIM=$'\033[38;5;245m'; C_HEAD=$'\033[38;5;75m'; C_TOT=$'\033[38;5;231m'
-  BAR=$'\u2588'
-else
-  RST=""; BOLD=""; C_DOWN=""; C_UP=""; C_DIM=""; C_HEAD=""; C_TOT=""; BAR="|"
-fi
 
-human() {
-  awk -v b="$1" 'BEGIN{
-    split("B KiB MiB GiB TiB PiB", u, " "); i=1
-    while (b>=1024 && i<6){ b/=1024; i++ }
-    if (b>=100) printf "%.0f %s", b, u[i]
-    else if (b>=10) printf "%.1f %s", b, u[i]
-    else printf "%.2f %s", b, u[i]
-  }'
-}
+def run(args):
+    return subprocess.run(["vnstat", *args], capture_output=True, text=True).stdout
 
-iface_arg=()
-[ -n "$iface" ] && iface_arg=(-i "$iface")
 
-# --- table geometry (fixed so output is consistent) ---
-W_L=12; W_B=20; W_V=10
-S_W=$(( W_L + 1 + W_B + 1 + W_B + 1 + W_V ))   # inner width shared by all boxes
+def human(b):
+    units = ["B", "KiB", "MiB", "GiB", "TiB", "PiB"]
+    i = 0
+    while b >= 1024 and i < len(units) - 1:
+        b /= 1024
+        i += 1
+    if b >= 100:
+        return f"{b:.0f} {units[i]}"
+    if b >= 10:
+        return f"{b:.1f} {units[i]}"
+    return f"{b:.2f} {units[i]}"
 
-# Parse vnStat textual output. Lines look like:
-#   2026-07-14   200.37 MiB |   20.38 MiB |  220.75 MiB |  431.76 kbit/s
-# Emits "rx|tx|total|date" in bytes; skips the estimated row automatically.
-parse_traffic() {
-  awk '
-    $1 ~ /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/ || $1 ~ /^[0-9]{4}-[0-9]{2}$/ {
-      if ($2 ~ /^[0-9.]+$/) {
-        u=$3
-        m=(u=="B")?1:(u=="KiB")?1024:(u=="MiB")?1048576:(u=="GiB")?1073741824:(u=="TiB")?1099511627776:1
-        printf "%.0f|%.0f|%.0f|%s\n", $2*m, $5*m, $8*m, $1
-      }
-    }'
-}
 
-summary=$(vnstat "${iface_arg[@]}" 2>/dev/null)
-name=$(echo "$summary" | awk '/since/{print $1; exit}'); name=${name:-vnstat}
-since=$(echo "$summary" | awk '/since/{print $3; exit}')
-read -r trx ttx ttot < <(echo "$summary" | awk '
-  /total:/{
-    u=$3
-    m=(u=="B")?1:(u=="KiB")?1024:(u=="MiB")?1048576:(u=="GiB")?1073741824:(u=="TiB")?1099511627776:1
-    printf "%.0f %.0f %.0f\n", $2*m, $5*m, $8*m; exit
-  }')
-trx=${trx:-0}; ttx=${ttx:-0}; ttot=${ttot:-0}
+def parse_rows(text):
+    rows = []
+    for line in text.splitlines():
+        dm = DATE_RE.match(line)
+        if not dm:
+            continue
+        vals = [(float(v), UNIT[u]) for v, u in VALUE_RE.findall(line)]
+        if len(vals) >= 3:
+            rx, tx, tot = (x * m for x, m in vals[:3])
+            rows.append((dm.group(1), rx, tx, tot))
+    return rows
 
-# days/monthly, sorted oldest-first by date (field 4)
-mapfile -t all_days < <(vnstat -d "${iface_arg[@]}" 2>/dev/null | parse_traffic | sort -t'|' -k4,4)
-mapfile -t months < <(vnstat -m "${iface_arg[@]}" 2>/dev/null | parse_traffic | sort -t'|' -k4,4)
 
-hborder() {
-  local l=$1 m=$2 r=$3
-  echo "  $l$(printf '─%.0s' $(seq 1 $W_L))$m$(printf '─%.0s' $(seq 1 $W_B))$m$(printf '─%.0s' $(seq 1 $W_B))$m$(printf '─%.0s' $(seq 1 $W_V))$r"
-}
-box_top() { echo "  ┌$(printf '─%.0s' $(seq 1 $S_W))┐"; }
-box_bot() { echo "  └$(printf '─%.0s' $(seq 1 $S_W))┘"; }
-box_row() {
-  local content="$1"
-  local stripped
-  stripped=$(printf '%s' "$content" | sed 's/\x1b\[[0-9;]*[a-zA-Z]//g; s/\x1b[()][AB0]//g')
-  local v=${#stripped}; local pad=$(( S_W - 1 - v )); [ "$pad" -lt 0 ] && pad=0
-  printf "  │ %s%*s │\n" "$content" "$pad" ""
-}
-# left-pad $1 with spaces to exactly $2 *characters* (codepoint-aware, not bytes)
-padtext() {
-  local t="$1" w=$2
-  local v=${#t}; local p=$(( w - v )); [ "$p" -lt 0 ] && p=0
-  printf '%s%*s' "$t" "$p" ""
-}
-# colored bar of exact width $3 (in cells), scaled value $1 / max $2.
-# Built by character concatenation so multibyte █ counts as 1 cell.
-mkbar() {
-  local v=$1 max=$2 w=$3 color=$4 n=0 s=""
-  [ "$max" -gt 0 ] && n=$(awk -v x="$v" -v m="$max" -v w="$w" 'BEGIN{printf "%d", x/m*w+0.5}')
-  for ((i = 0; i < n; i++)); do s+="$BAR"; done
-  for ((i = n; i < w; i++)); do s+=" "; done
-  printf '%s%s%s' "$color" "$s" "$RST"
-}
+def parse_summary(text):
+    for line in text.splitlines():
+        if re.search(r"\btotal:", line, re.I):
+            vals = [(float(v), UNIT[u]) for v, u in VALUE_RE.findall(line)]
+            if len(vals) >= 3:
+                return [x * m for x, m in vals[:3]]
+    return [0, 0, 0]
 
-render_section() {
-  local title="$1"; shift
-  local -a rows=("$@")
-  [ ${#rows[@]} -eq 0 ] && return
-  local maxr=0 maxt=0 rx tx rest
-  for r in "${rows[@]}"; do
-    rx=${r%%|*}; rest=${r#*|}; tx=${rest%%|*}
-    [ "$rx" -gt "$maxr" ] && maxr=$rx
-    [ "$tx" -gt "$maxt" ] && maxt=$tx
-  done
-  printf "  ${BOLD}${C_HEAD}%s${RST}\n" "$title"
-  hborder '┌' '┬' '┐'
-  printf "  │ ${C_DIM}%s${RST} │ ${C_DIM}%s${RST} │ ${C_DIM}%s${RST} │ ${C_DIM}%s${RST} │\n" \
-    "$(padtext "Date" "$W_L")" "$(padtext "↓ download" "$W_B")" "$(padtext "↑ upload" "$W_B")" "$(padtext "Total" "$W_V")"
-  hborder '├' '┼' '┤'
-  local tot label
-  for r in "${rows[@]}"; do
-    rx=${r%%|*}; rest=${r#*|}; tx=${rest%%|*}; rest=${rest#*|}; tot=${rest%%|*}; label=${rest#*|}
-    printf "  │ ${C_DIM}%s${RST} │ %s │ %s │ ${C_TOT}%s${RST} │\n" \
-      "$(padtext "$label" "$W_L")" "$(mkbar "$rx" "$maxr" "$W_B" "$C_DOWN")" "$(mkbar "$tx" "$maxt" "$W_B" "$C_UP")" "$(padtext "$(human "$tot")" "$W_V")"
-  done
-  hborder '└' '┴' '┘'
-  echo
-}
 
-echo
-box_top
-box_row "$(printf '%s%s%s · %s · since %s' "$BOLD$C_HEAD" "vnStat" "$RST" "$name" "$since")"
-box_row "$(printf 'total  %s%s%s   %s%s%s   %s%s%s' "$C_DOWN" "↓ $(human "$trx")" "$RST" "$C_UP" "↑ $(human "$ttx")" "$RST" "$C_TOT" "= $(human "$ttot")" "$RST")"
-box_bot
-echo
+def meta(text, iface):
+    name = iface
+    if not name:
+        for line in text.splitlines():
+            line = line.strip()
+            if line:
+                name = line.split()[0].rstrip(":/")
+                break
+    since = ""
+    m = re.search(r"since\s+(\S+)", text)
+    if m:
+        since = m.group(1)
+    return name, since
 
-if [ "$week" -eq 1 ]; then
-  n=${#all_days[@]}
-  start=$(( n - 7 * wnum )); [ "$start" -lt 0 ] && start=0
-  len=7; [ $(( start + len )) -gt "$n" ] && len=$(( n - start ))
-  entries=("${all_days[@]:start:len}")
-  if [ ${#entries[@]} -eq 0 ]; then
-    printf "  ${C_DIM}no data for week %s${RST}\n\n" "$wnum"
-  else
-    wtot=0
-    for e in "${entries[@]}"; do t=${e#*|}; t=${t#*|}; t=${t%%|*}; wtot=$(( wtot + t )); done
-    rev=()
-    for ((i = ${#entries[@]} - 1; i >= 0; i--)); do rev+=("${entries[i]}"); done
-    render_section "Week $wnum · ${entries[0]##*|} – ${entries[-1]##*|} · $(human "$wtot")" "${rev[@]}"
-  fi
-else
-  if [ "$show_daily" -eq 1 ]; then
-    n=${#all_days[@]}; take=1
-    dr=()
-    for ((i = n - take; i < n; i++)); do dr+=("${all_days[i]}"); done
-    rev=()
-    for ((i = ${#dr[@]} - 1; i >= 0; i--)); do rev+=("${dr[i]}"); done
-    render_section "Daily" "${rev[@]}"
-  fi
-  [ "$show_monthly" -eq 1 ] && render_section "Monthly" "${months[@]}"
-fi
+
+def bar(value, maximum, style):
+    n = 0 if maximum <= 0 else round(value / maximum * BAR_W)
+    n = max(0, min(n, BAR_W))
+    return "█" * n + " " * (BAR_W - n)
+
+
+def render_section(title, rows):
+    if not rows:
+        console.print(f"[dim]{title}: no data[/dim]\n")
+        return
+    maxr = max(r[1] for r in rows) or 1
+    maxt = max(r[2] for r in rows) or 1
+    t = Table(title=title, header_style="bold cyan", expand=False)
+    t.add_column("Date", style="dim")
+    t.add_column("↓ download", style="green")
+    t.add_column("↑ upload", style="yellow")
+    t.add_column("Total", style="white", justify="right")
+    for date, rx, tx, tot in rows:
+        t.add_row(date, bar(rx, maxr, "green"), bar(tx, maxt, "yellow"), human(tot))
+    console.print(t, "\n")
+
+
+def main():
+    iface = ""
+    week = 0
+    wnum = 1
+    show_daily = 1
+    show_monthly = 0
+    args = sys.argv[1:]
+    i = 0
+    while i < len(args):
+        a = args[i]
+        if a == "-i":
+            iface = args[i + 1]
+            i += 2
+        elif a == "-w":
+            week = 1
+            if i + 1 < len(args) and re.fullmatch(r"\d+", args[i + 1]):
+                wnum = int(args[i + 1])
+                i += 1
+            i += 1
+        elif a == "-m":
+            show_daily = 0
+            show_monthly = 1
+            i += 1
+        elif a == "-d":
+            show_daily = 1
+            show_monthly = 0
+            i += 1
+        elif a in ("-h", "--help"):
+            print(__doc__)
+            return
+        else:
+            print(f"unknown arg: {a}", file=sys.stderr)
+            sys.exit(1)
+
+    iface_args = ["-i", iface] if iface else []
+    summary = run(iface_args)
+    name, since = meta(summary, iface)
+    trx, ttx, ttot = parse_summary(summary)
+
+    console.print(
+        Panel(
+            f"vnStat · {name} · since {since}\n"
+            f"total  [green]↓ {human(trx)}[/green]   [yellow]↑ {human(ttx)}[/yellow]   = {human(ttot)}",
+            border_style="cyan",
+        )
+    )
+
+    days = parse_rows(run(["-d", *iface_args]))
+    months = parse_rows(run(["-m", *iface_args]))
+    n = len(days)
+
+    if week:
+        lo, hi = 7 * (wnum - 1), 7 * wnum
+        entries = [days[k] for k in range(n) if (n - 1 - k) in range(lo, hi)]
+        if not entries:
+            console.print(f"[dim]no data for week {wnum}[/dim]\n")
+        else:
+            render_section(
+                f"Week {wnum} · {entries[-1][0]} – {entries[0][0]} · {human(sum(e[3] for e in entries))}",
+                list(reversed(entries)),
+            )
+    else:
+        if show_daily:
+            today = days[-1:] if n else []
+            render_section("Daily", list(reversed(today)))
+        if show_monthly:
+            render_section("Monthly", list(reversed(months)))
+
+
+if __name__ == "__main__":
+    main()
