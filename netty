@@ -77,10 +77,15 @@ def meta(text, iface):
     name = iface
     if not name:
         for line in text.splitlines():
-            line = line.strip()
-            if line:
+            if "since" in line.lower():
                 name = line.split()[0].rstrip(":/")
                 break
+        if not name:
+            for line in text.splitlines():
+                line = line.strip()
+                if line:
+                    name = line.split()[0].rstrip(":/")
+                    break
     since = ""
     m = re.search(r"since\s+(\S+)", text)
     if m:
