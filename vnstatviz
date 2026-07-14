@@ -4,9 +4,11 @@
 set -euo pipefail
 
 iface=""
+week=0
 while [ $# -gt 0 ]; do
   case "$1" in
     -i) iface="$2"; shift 2 ;;
+    -w) week=1; shift ;;
     -h|--help) sed -n '2,12p' "$0"; exit 0 ;;
     *) echo "unknown arg: $1" >&2; exit 1 ;;
   esac
@@ -92,7 +94,8 @@ draw_section() {
   echo
 }
 
-mapfile -t days < <(jq -r '.interfaces[0].traffic.days | reverse | .[0:8] | .[] |
+slice=$(( week ? 8 : 1 ))
+mapfile -t days < <(jq -r --argjson n "$slice" '.interfaces[0].traffic.days | reverse | .[0:$n] | .[] |
   "\(.rx)|\(.tx)|\(.rx+.tx)|\(.date.year)-\(.date.month|tostring|if length==1 then "0"+. else . end)-\(.date.day|tostring|if length==1 then "0"+. else . end)"' <<<"$summary")
 mapfile -t months < <(jq -r '.interfaces[0].traffic.months[] |
   "\(.rx)|\(.tx)|\(.rx+.tx)|\(.date.year)-\(.date.month|tostring|if length==1 then "0"+. else . end)"' <<<"$summary")
