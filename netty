@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# netty — render vnStat traffic stats as a clean, colored bar chart.
+# netty — render vnStat traffic stats as a clean, bordered bar-chart table.
 # Parses vnStat's textual output (no JSON, no jq needed). No estimates shown.
 #
 # Usage: netty [-i iface] [-w [N]] [-d|-m]
 #   -i iface   select interface (default: first in database)
-#   -w [N]     weekly view: a week summary bar with per-day detail underneath.
-#              N=1 (default) = most recent 7 days, N=2 = the week before, etc.
+#   -w [N]     weekly view: a week of per-day rows. N=1 (default) = most recent
+#              7 days, N=2 = the week before, etc.
 #   -d         daily only (today)  [default]
 #   -m         monthly only
 #   (default shows the Daily section only)
@@ -64,8 +64,9 @@ human() {
 iface_arg=()
 [ -n "$iface" ] && iface_arg=(-i "$iface")
 
-cols=$(tput cols 2>/dev/null || true); [ -z "$cols" ] && cols=80
-barw=$(( cols > 70 ? 34 : 18 ))
+# --- table geometry (fixed so output is consistent) ---
+W_L=12; W_B=20; W_V=10
+S_W=$(( W_L + 1 + W_B + 1 + W_B + 1 + W_V ))   # inner width shared by all boxes
 
 # Parse vnStat textual output. Lines look like:
 #   2026-07-14   200.37 MiB |   20.38 MiB |  220.75 MiB |  431.76 kbit/s
@@ -96,80 +97,82 @@ trx=${trx:-0}; ttx=${ttx:-0}; ttot=${ttot:-0}
 mapfile -t all_days < <(vnstat -d "${iface_arg[@]}" 2>/dev/null | parse_traffic | sort -t'|' -k4,4)
 mapfile -t months < <(vnstat -m "${iface_arg[@]}" 2>/dev/null | parse_traffic | sort -t'|' -k4,4)
 
-draw_section() {
+hborder() {
+  local l=$1 m=$2 r=$3
+  echo "  $l$(printf '─%.0s' $(seq 1 $W_L))$m$(printf '─%.0s' $(seq 1 $W_B))$m$(printf '─%.0s' $(seq 1 $W_B))$m$(printf '─%.0s' $(seq 1 $W_V))$r"
+}
+box_top() { echo "  ┌$(printf '─%.0s' $(seq 1 $S_W))┐"; }
+box_bot() { echo "  └$(printf '─%.0s' $(seq 1 $S_W))┘"; }
+box_row() {
+  local content="$1"
+  local stripped
+  stripped=$(printf '%s' "$content" | sed 's/\x1b\[[0-9;]*[a-zA-Z]//g; s/\x1b[()][AB0]//g')
+  local v=${#stripped}; local pad=$(( S_W - 1 - v )); [ "$pad" -lt 0 ] && pad=0
+  printf "  │ %s%*s │\n" "$content" "$pad" ""
+}
+# colored bar of exact width $3, scaled value $1 / max $2
+mkbar() {
+  local v=$1 max=$2 w=$3 color=$4 n=0
+  [ "$max" -gt 0 ] && n=$(awk -v x="$v" -v m="$max" -v w="$w" 'BEGIN{printf "%d", x/m*w+0.5}')
+  awk -v n="$n" -v w="$w" -v c="$BAR" -v color="$color" -v rst="$RST" 'BEGIN{
+    s=""; for(i=0;i<n;i++) s=s c; printf "%s%s%s", color, sprintf("%-*s", w, s), rst
+  }'
+}
+
+render_section() {
   local title="$1"; shift
   local -a rows=("$@")
   [ ${#rows[@]} -eq 0 ] && return
-  printf "${BOLD}${C_HEAD}  %s${RST}\n" "$title"
-  local max=0 label total rx tx rl tl
+  local maxr=0 maxt=0 rx tx rest
   for r in "${rows[@]}"; do
-    rest=${r#*|}; total=${rest%%|*}
-    [ "$total" -gt "$max" ] && max=$total
+    rx=${r%%|*}; rest=${r#*|}; tx=${rest%%|*}
+    [ "$rx" -gt "$maxr" ] && maxr=$rx
+    [ "$tx" -gt "$maxt" ] && maxt=$tx
   done
+  printf "  ${BOLD}${C_HEAD}%s${RST}\n" "$title"
+  hborder '┌' '┬' '┐'
+  printf "  │ ${C_DIM}%-${W_L}s${RST} │ ${C_DIM}%-${W_B}s${RST} │ ${C_DIM}%-${W_B}s${RST} │ ${C_DIM}%${W_V}s${RST} │\n" \
+    "Date" "↓ download" "↑ upload" "Total"
+  hborder '├' '┼' '┤'
+  local tot label
   for r in "${rows[@]}"; do
-    rx=${r%%|*}; rest=${r#*|}; tx=${rest%%|*}; rest=${rest#*|}; total=${rest%%|*}; label=${rest#*|}
-    if [ "$max" -gt 0 ]; then
-      rl=$(awk -v x="$rx" -v m="$max" -v w="$barw" 'BEGIN{printf "%d", x/m*w+0.5}')
-      tl=$(awk -v x="$tx" -v m="$max" -v w="$barw" 'BEGIN{printf "%d", x/m*w+0.5}')
-    else rl=0; tl=0; fi
-    printf "  ${C_DIM}%-12s${RST} ${C_DOWN}%s${RST}${C_UP}%s${RST} %s\n" \
-      "$label" "$(printf '%-*s' "$rl" "$BAR")" "$(printf '%-*s' "$tl" "$BAR")" "$(human "$total")"
+    rx=${r%%|*}; rest=${r#*|}; tx=${rest%%|*}; rest=${rest#*|}; tot=${rest%%|*}; label=${rest#*|}
+    printf "  │ ${C_DIM}%-${W_L}s${RST} │ %s │ %s │ ${C_TOT}%${W_V}s${RST} │\n" \
+      "$label" "$(mkbar "$rx" "$maxr" "$W_B" "$C_DOWN")" "$(mkbar "$tx" "$maxt" "$W_B" "$C_UP")" "$(human "$tot")"
   done
-  echo
-}
-
-# Weekly view: one week summary bar on top, per-day detail underneath.
-# wnum=1 -> most recent 7 days, 2 -> the week before that, etc.
-draw_week() {
-  local wn=$1
-  local n=${#all_days[@]}
-  local start=$(( n - 7 * wn ))
-  [ "$start" -lt 0 ] && start=0
-  local len=7; [ $(( start + len )) -gt "$n" ] && len=$(( n - start ))
-  local entries=("${all_days[@]:start:len}")
-  [ ${#entries[@]} -eq 0 ] && { printf "${C_DIM}  no data for week %s${RST}\n\n" "$wn"; return; }
-  local wtot=0 tot first=${entries[0]} last=${entries[-1]}
-  for e in "${entries[@]}"; do tot=${e#*|}; tot=${tot#*|}; tot=${tot%%|*}; wtot=$(( wtot + tot )); done
-  printf "${BOLD}${C_HEAD}  Week %s · %s – %s${RST}  ${C_TOT}%s${RST}\n" \
-    "$wn" "${first##*|}" "${last##*|}" "$(human "$wtot")"
-  printf "  ${C_TOT}%s${RST}\n" "$(printf '%-*s' "$barw" "$BAR")"
-  local rev=()
-  for ((i = ${#entries[@]} - 1; i >= 0; i--)); do rev+=("${entries[i]}"); done
-  local rx tx tot label rl tl rest
-  for e in "${rev[@]}"; do
-    rx=${e%%|*}; rest=${e#*|}; tx=${rest%%|*}; rest=${rest#*|}; tot=${rest%%|*}; label=${rest#*|}
-    if [ "$wtot" -gt 0 ]; then
-      rl=$(awk -v x="$rx" -v m="$wtot" -v w="$barw" 'BEGIN{printf "%d", x/m*w+0.5}')
-      tl=$(awk -v x="$tx" -v m="$wtot" -v w="$barw" 'BEGIN{printf "%d", x/m*w+0.5}')
-    else rl=0; tl=0; fi
-    printf "  ${C_DIM}%-12s${RST} ${C_DOWN}%s${RST}${C_UP}%s${RST} %s\n" \
-      "$label" "$(printf '%-*s' "$rl" "$BAR")" "$(printf '%-*s' "$tl" "$BAR")" "$(human "$tot")"
-  done
+  hborder '└' '┴' '┘'
   echo
 }
 
 echo
-printf "${BOLD}${C_HEAD}  vnStat ${RST}${C_DIM}·${RST} ${BOLD}%s${RST} ${C_DIM}· since %s${RST}\n" "$name" "$since"
-printf "${C_DIM}  %s${RST}\n" "$(printf '─%.0s' $(seq 1 $(( cols > 60 ? 50 : 30 ))))"
-printf "  ${C_DIM}total${RST}  ${C_DOWN}↓ %-12s${RST} ${C_UP}↑ %-12s${RST} ${C_TOT}= %s${RST}\n" \
-  "$(human "$trx")" "$(human "$ttx")" "$(human "$ttot")"
-printf "  ${C_DOWN}%s${RST}${C_UP}%s${RST}\n" \
-  "$(printf '%-*s' $(( barw * trx / (ttot>0?ttot:1) )) "$BAR")" \
-  "$(printf '%-*s' $(( barw * ttx / (ttot>0?ttot:1) )) "$BAR")"
+box_top
+box_row "$(printf '%s%s%s · %s · since %s' "$BOLD$C_HEAD" "vnStat" "$RST" "$name" "$since")"
+box_row "$(printf 'total  %s%s%s   %s%s%s   %s%s%s' "$C_DOWN" "↓ $(human "$trx")" "$RST" "$C_UP" "↑ $(human "$ttx")" "$RST" "$C_TOT" "= $(human "$ttot")" "$RST")"
+box_bot
 echo
 
 if [ "$week" -eq 1 ]; then
-  draw_week "$wnum"
+  n=${#all_days[@]}
+  start=$(( n - 7 * wnum )); [ "$start" -lt 0 ] && start=0
+  len=7; [ $(( start + len )) -gt "$n" ] && len=$(( n - start ))
+  entries=("${all_days[@]:start:len}")
+  if [ ${#entries[@]} -eq 0 ]; then
+    printf "  ${C_DIM}no data for week %s${RST}\n\n" "$wnum"
+  else
+    wtot=0
+    for e in "${entries[@]}"; do t=${e#*|}; t=${t#*|}; t=${t%%|*}; wtot=$(( wtot + t )); done
+    rev=()
+    for ((i = ${#entries[@]} - 1; i >= 0; i--)); do rev+=("${entries[i]}"); done
+    render_section "Week $wnum · ${entries[0]##*|} – ${entries[-1]##*|} · $(human "$wtot")" "${rev[@]}"
+  fi
 else
   if [ "$show_daily" -eq 1 ]; then
     n=${#all_days[@]}; take=1
-    daily_rows=()
-    for ((i = n - take; i < n; i++)); do daily_rows+=("${all_days[i]}"); done
+    dr=()
+    for ((i = n - take; i < n; i++)); do dr+=("${all_days[i]}"); done
     rev=()
-    for ((i = ${#daily_rows[@]} - 1; i >= 0; i--)); do rev+=("${daily_rows[i]}"); done
-    draw_section "Daily" "${rev[@]}"
+    for ((i = ${#dr[@]} - 1; i >= 0; i--)); do rev+=("${dr[i]}"); done
+    render_section "Daily" "${rev[@]}"
   fi
-  [ "$show_monthly" -eq 1 ] && draw_section "Monthly" "${months[@]}"
+  [ "$show_monthly" -eq 1 ] && render_section "Monthly" "${months[@]}"
 fi
-
-printf "${C_DIM}  ↓ download   ${C_UP}%s${RST} ${C_DIM}↑ upload${RST}\n" "$BAR"
