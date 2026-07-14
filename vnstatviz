@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+# vnstatviz — render vnStat traffic stats as a clean, colored bar chart.
+# No estimates, no weekly flag (removed in vnStat 2.x). Requires vnstat + jq.
+set -euo pipefail
+
+iface=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -i) iface="$2"; shift 2 ;;
+    -h|--help) sed -n '2,12p' "$0"; exit 0 ;;
+    *) echo "unknown arg: $1" >&2; exit 1 ;;
+  esac
+done
+
+need() { command -v "$1" >/dev/null 2>&1 || { echo "$1 not found" >&2; exit 1; }; }
+need() { command -v "$1" >/dev/null 2>&1 || { echo "$1 not found" >&2; exit 1; }; }
+ensure() {
+  command -v "$1" >/dev/null 2>&1 && return 0
+  echo "$1 not found, installing..." >&2
+  if command -v apt-get >/dev/null; then sudo apt-get update -qq && sudo apt-get install -y "$1"
+  elif command -v pacman >/dev/null; then sudo pacman -S --noconfirm "$1"
+  elif command -v dnf >/dev/null; then sudo dnf install -y "$1"
+  elif command -v brew >/dev/null; then brew install "$1"; fi
+  command -v "$1" >/dev/null 2>&1 || { echo "could not install $1" >&2; exit 1; }
+}
+ensure vnstat
+ensure jq
+: "${TERM:=xterm}"
+
+# --- color (disabled when output is not a terminal) ---
+if [ -t 1 ] || [ -n "${FORCE_COLOR:-}" ]; then
+  RST=$(tput sgr0); BOLD=$(tput bold)
+  C_DOWN=$'\033[38;5;46m'; C_UP=$'\033[38;5;214m'
+  C_DIM=$'\033[38;5;245m'; C_HEAD=$'\033[38;5;75m'; C_TOT=$'\033[38;5;231m'
+  BAR=$'\u2588'
+else
+  RST=""; BOLD=""; C_DOWN=""; C_UP=""; C_DIM=""; C_HEAD=""; C_TOT=""; BAR="|"
+fi
+
+iface_arg=()
+[ -n "$iface" ] && iface_arg=(--iface "$iface")
+
+human() {
+  awk -v b="$1" 'BEGIN{
+    split("B KiB MiB GiB TiB PiB", u, " "); i=1
+    while (b>=1024 && i<6){ b/=1024; i++ }
+    if (b>=100) printf "%.0f %s", b, u[i]
+    else if (b>=10) printf "%.1f %s", b, u[i]
+    else printf "%.2f %s", b, u[i]
+  }'
+}
+
+cols=$(tput cols 2>/dev/null || true); [ -z "$cols" ] && cols=80
+barw=$(( cols > 70 ? 34 : 18 ))
+
+summary=$(vnstat --json "${iface_arg[@]}")
+name=$(jq -r '.interfaces[0].name' <<<"$summary")
+since=$(jq -r '.interfaces[0].created.date | "\(.year)-\(.month|tostring|if length==1 then "0"+. else . end)-\(.day|tostring|if length==1 then "0"+. else . end)"' <<<"$summary")
+trx=$(jq -r '.interfaces[0].traffic.total.rx' <<<"$summary")
+ttx=$(jq -r '.interfaces[0].traffic.total.tx' <<<"$summary")
+ttot=$(( trx + ttx ))
+
+echo
+printf "${BOLD}${C_HEAD}  vnStat ${RST}${C_DIM}·${RST} ${BOLD}%s${RST} ${C_DIM}· since %s${RST}\n" "$name" "$since"
+printf "${C_DIM}  %s${RST}\n" "$(printf '─%.0s' $(seq 1 $(( cols > 60 ? 50 : 30 ))))"
+printf "  ${C_DIM}total${RST}  ${C_DOWN}↓ %-12s${RST} ${C_UP}↑ %-12s${RST} ${C_TOT}= %s${RST}\n" \
+  "$(human "$trx")" "$(human "$ttx")" "$(human "$ttot")"
+    printf "  ${C_DOWN}%s${RST}${C_UP}%s${RST}\n" \
+      "$(printf '%-*s' $(( barw * trx / (ttot>0?ttot:1) )) "$BAR")" \
+      "$(printf '%-*s' $(( barw * ttx / (ttot>0?ttot:1) )) "$BAR")"
+echo
+
+draw_section() {
+  local title="$1"; shift
+  local -a rows=("$@")
+  [ ${#rows[@]} -eq 0 ] && return
+  printf "${BOLD}${C_HEAD}  %s${RST}\n" "$title"
+  local max=0 label total rx tx rl tl
+  for r in "${rows[@]}"; do
+    rest=${r#*|}; total=${rest%%|*}
+    [ "$total" -gt "$max" ] && max=$total
+  done
+  for r in "${rows[@]}"; do
+    rx=${r%%|*}; rest=${r#*|}; tx=${rest%%|*}; rest=${rest#*|}; total=${rest%%|*}; label=${rest#*|}
+    if [ "$max" -gt 0 ]; then
+      rl=$(awk -v x="$rx" -v m="$max" -v w="$barw" 'BEGIN{printf "%d", x/m*w+0.5}')
+      tl=$(awk -v x="$tx" -v m="$max" -v w="$barw" 'BEGIN{printf "%d", x/m*w+0.5}')
+    else rl=0; tl=0; fi
+    printf "  ${C_DIM}%-12s${RST} ${C_DOWN}%s${RST}${C_UP}%s${RST} %s\n" \
+      "$label" "$(printf '%-*s' "$rl" "$BAR")" "$(printf '%-*s' "$tl" "$BAR")" "$(human "$total")"
+  done
+  echo
+}
+
+mapfile -t days < <(jq -r '.interfaces[0].traffic.days[] |
+  "\(.rx)|\(.tx)|\(.rx+.tx)|\(.date.year)-\(.date.month|tostring|if length==1 then "0"+. else . end)-\(.date.day|tostring|if length==1 then "0"+. else . end)"' <<<"$summary")
+mapfile -t months < <(jq -r '.interfaces[0].traffic.months[] |
+  "\(.rx)|\(.tx)|\(.rx+.tx)|\(.date.year)-\(.date.month|tostring|if length==1 then "0"+. else . end)"' <<<"$summary")
+
+# newest last for charts
+draw_section "Daily" "${days[@]}"
+draw_section "Monthly" "${months[@]}"
+
+printf "${C_DIM}  ↓ download   ${C_UP}%s${RST} ${C_DIM}↑ upload${RST}\n" "$BAR"

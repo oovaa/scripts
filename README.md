@@ -22,6 +22,12 @@ This script automates the process of updating and upgrading your system packages
 
 Usage: `./uniupdate`
 
+### [vnstatviz](vnstatviz)
+
+Renders `vnstat` traffic statistics (daily + monthly) as a clean, colored bar chart with download/upload split. No estimates, no weekly view (removed in vnStat 2.x). Installs `vnstat`/`jq` if missing.
+
+Usage: `./vnstatviz [-i interface]`
+
 ## Requirements
 
 - Bash shell
