@@ -26,9 +26,9 @@ Usage: `./uniupdate`
 
 Renders `vnstat` traffic statistics (daily + monthly) as a clean, colored bar chart with download/upload split. No estimates, no weekly view (removed in vnStat 2.x). Installs `vnstat`/`jq` if missing.
 
-Usage: `./netty [-i interface] [-w]`
+Usage: `./netty [-i interface] [-w] [-m]`
 
-Pass `-w` to show the last 8 days (today back to the same weekday last week); without it the Daily section shows only today.
+By default shows the Daily section only (today). Pass `-w` for the last 8 days (today back to the same weekday last week); `-m` to show the Monthly section instead.
 
 ## Requirements
 

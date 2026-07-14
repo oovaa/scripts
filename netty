@@ -1,20 +1,30 @@
 #!/usr/bin/env bash
 # netty — render vnStat traffic stats as a clean, colored bar chart.
 # No estimates, no weekly flag (removed in vnStat 2.x). Requires vnstat + jq.
+#
+# Usage: netty [-i iface] [-w] [-d|-m]
+#   -i iface   select interface (default: first in database)
+#   -w         daily = last 8 days (today back to same weekday last week)
+#   -d         daily only (today, or week with -w)  [default]
+#   -m         monthly only
+#   (default shows the daily section only)
 set -euo pipefail
 
 iface=""
 week=0
+show_daily=1
+show_monthly=0
 while [ $# -gt 0 ]; do
   case "$1" in
     -i) iface="$2"; shift 2 ;;
     -w) week=1; shift ;;
+    -d) show_daily=1; show_monthly=0; shift ;;
+    -m) show_daily=0; show_monthly=1; shift ;;
     -h|--help) sed -n '2,12p' "$0"; exit 0 ;;
     *) echo "unknown arg: $1" >&2; exit 1 ;;
   esac
 done
 
-need() { command -v "$1" >/dev/null 2>&1 || { echo "$1 not found" >&2; exit 1; }; }
 need() { command -v "$1" >/dev/null 2>&1 || { echo "$1 not found" >&2; exit 1; }; }
 ensure() {
   command -v "$1" >/dev/null 2>&1 && return 0
@@ -56,6 +66,8 @@ cols=$(tput cols 2>/dev/null || true); [ -z "$cols" ] && cols=80
 barw=$(( cols > 70 ? 34 : 18 ))
 
 summary=$(vnstat --json "${iface_arg[@]}")
+days_json=$(vnstat --json d "${iface_arg[@]}" 2>/dev/null || true)
+months_json=$(vnstat --json m "${iface_arg[@]}" 2>/dev/null || true)
 name=$(jq -r '.interfaces[0].name' <<<"$summary")
 since=$(jq -r '.interfaces[0].created.date | "\(.year)-\(.month|tostring|if length==1 then "0"+. else . end)-\(.day|tostring|if length==1 then "0"+. else . end)"' <<<"$summary")
 trx=$(jq -r '.interfaces[0].traffic.total.rx' <<<"$summary")
@@ -95,13 +107,12 @@ draw_section() {
 }
 
 slice=$(( week ? 8 : 1 ))
-mapfile -t days < <(jq -r --argjson n "$slice" '.interfaces[0].traffic.days | reverse | .[0:$n] | .[] |
-  "\(.rx)|\(.tx)|\(.rx+.tx)|\(.date.year)-\(.date.month|tostring|if length==1 then "0"+. else . end)-\(.date.day|tostring|if length==1 then "0"+. else . end)"' <<<"$summary")
-mapfile -t months < <(jq -r '.interfaces[0].traffic.months[] |
-  "\(.rx)|\(.tx)|\(.rx+.tx)|\(.date.year)-\(.date.month|tostring|if length==1 then "0"+. else . end)"' <<<"$summary")
+mapfile -t days < <(jq -r --argjson n "$slice" '.interfaces[0].traffic.days // [] | reverse | .[0:$n] | .[] |
+  "\(.rx)|\(.tx)|\(.rx+.tx)|\(.date.year)-\(.date.month|tostring|if length==1 then "0"+. else . end)-\(.date.day|tostring|if length==1 then "0"+. else . end)"' <<<"$days_json")
+mapfile -t months < <(jq -r '.interfaces[0].traffic.months // [] | .[] |
+  "\(.rx)|\(.tx)|\(.rx+.tx)|\(.date.year)-\(.date.month|tostring|if length==1 then "0"+. else . end)"' <<<"$months_json")
 
-# newest last for charts
-draw_section "Daily" "${days[@]}"
-draw_section "Monthly" "${months[@]}"
+[ "$show_daily" -eq 1 ] && draw_section "Daily" "${days[@]}"
+[ "$show_monthly" -eq 1 ] && draw_section "Monthly" "${months[@]}"
 
 printf "${C_DIM}  ↓ download   ${C_UP}%s${RST} ${C_DIM}↑ upload${RST}\n" "$BAR"
