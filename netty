@@ -129,7 +129,7 @@ draw_week() {
   local entries=("${all_days[@]:start:len}")
   [ ${#entries[@]} -eq 0 ] && { printf "${C_DIM}  no data for week %s${RST}\n\n" "$wn"; return; }
   local wtot=0 tot first=${entries[0]} last=${entries[-1]}
-  for e in "${entries[@]}"; do tot=${e#*|}; tot=${tot%%|*}; wtot=$(( wtot + tot )); done
+  for e in "${entries[@]}"; do tot=${e#*|}; tot=${tot#*|}; tot=${tot%%|*}; wtot=$(( wtot + tot )); done
   printf "${BOLD}${C_HEAD}  Week %s · %s – %s${RST}  ${C_TOT}%s${RST}\n" \
     "$wn" "${first##*|}" "${last##*|}" "$(human "$wtot")"
   printf "  ${C_TOT}%s${RST}\n" "$(printf '%-*s' "$barw" "$BAR")"
