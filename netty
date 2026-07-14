@@ -15,6 +15,7 @@
 import re
 import subprocess
 import sys
+from datetime import datetime, date, timedelta
 
 from rich.console import Console
 from rich.panel import Panel
@@ -167,15 +168,21 @@ def main():
     n = len(days)
 
     if week:
-        lo, hi = 7 * (wnum - 1), 7 * wnum
-        entries = [days[k] for k in range(n) if (n - 1 - k) in range(lo, hi)]
-        if not entries:
-            console.print(f"[dim]no data for week {wnum}[/dim]\n")
-        else:
-            render_section(
-                f"Week {wnum} · {entries[-1][0]} – {entries[0][0]} · {human(sum(e[3] for e in entries))}",
-                list(reversed(entries)),
-            )
+        dates = [datetime.strptime(d[0], "%Y-%m-%d").date() for d in days]
+        anchor = max(dates) if dates else date.today()
+        end = anchor - timedelta(days=7 * (wnum - 1))
+        start = end - timedelta(days=6)
+        by_date = {d[0]: d for d in days}
+        window = []
+        d = start
+        while d <= end:
+            key = d.strftime("%Y-%m-%d")
+            window.append(by_date.get(key, (key, 0, 0, 0)))
+            d += timedelta(days=1)
+        render_section(
+            f"Week {wnum} · {window[0][0]} – {window[-1][0]} · {human(sum(r[3] for r in window))}",
+            list(reversed(window)),
+        )
     else:
         if show_daily:
             today = days[-1:] if n else []
