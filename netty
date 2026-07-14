@@ -110,13 +110,20 @@ box_row() {
   local v=${#stripped}; local pad=$(( S_W - 1 - v )); [ "$pad" -lt 0 ] && pad=0
   printf "  │ %s%*s │\n" "$content" "$pad" ""
 }
-# colored bar of exact width $3, scaled value $1 / max $2
+# left-pad $1 with spaces to exactly $2 *characters* (codepoint-aware, not bytes)
+padtext() {
+  local t="$1" w=$2
+  local v=${#t}; local p=$(( w - v )); [ "$p" -lt 0 ] && p=0
+  printf '%s%*s' "$t" "$p" ""
+}
+# colored bar of exact width $3 (in cells), scaled value $1 / max $2.
+# Built by character concatenation so multibyte █ counts as 1 cell.
 mkbar() {
-  local v=$1 max=$2 w=$3 color=$4 n=0
+  local v=$1 max=$2 w=$3 color=$4 n=0 s=""
   [ "$max" -gt 0 ] && n=$(awk -v x="$v" -v m="$max" -v w="$w" 'BEGIN{printf "%d", x/m*w+0.5}')
-  awk -v n="$n" -v w="$w" -v c="$BAR" -v color="$color" -v rst="$RST" 'BEGIN{
-    s=""; for(i=0;i<n;i++) s=s c; printf "%s%s%s", color, sprintf("%-*s", w, s), rst
-  }'
+  for ((i = 0; i < n; i++)); do s+="$BAR"; done
+  for ((i = n; i < w; i++)); do s+=" "; done
+  printf '%s%s%s' "$color" "$s" "$RST"
 }
 
 render_section() {
@@ -131,14 +138,14 @@ render_section() {
   done
   printf "  ${BOLD}${C_HEAD}%s${RST}\n" "$title"
   hborder '┌' '┬' '┐'
-  printf "  │ ${C_DIM}%-${W_L}s${RST} │ ${C_DIM}%-${W_B}s${RST} │ ${C_DIM}%-${W_B}s${RST} │ ${C_DIM}%${W_V}s${RST} │\n" \
-    "Date" "↓ download" "↑ upload" "Total"
+  printf "  │ ${C_DIM}%s${RST} │ ${C_DIM}%s${RST} │ ${C_DIM}%s${RST} │ ${C_DIM}%s${RST} │\n" \
+    "$(padtext "Date" "$W_L")" "$(padtext "↓ download" "$W_B")" "$(padtext "↑ upload" "$W_B")" "$(padtext "Total" "$W_V")"
   hborder '├' '┼' '┤'
   local tot label
   for r in "${rows[@]}"; do
     rx=${r%%|*}; rest=${r#*|}; tx=${rest%%|*}; rest=${rest#*|}; tot=${rest%%|*}; label=${rest#*|}
-    printf "  │ ${C_DIM}%-${W_L}s${RST} │ %s │ %s │ ${C_TOT}%${W_V}s${RST} │\n" \
-      "$label" "$(mkbar "$rx" "$maxr" "$W_B" "$C_DOWN")" "$(mkbar "$tx" "$maxt" "$W_B" "$C_UP")" "$(human "$tot")"
+    printf "  │ ${C_DIM}%s${RST} │ %s │ %s │ ${C_TOT}%s${RST} │\n" \
+      "$(padtext "$label" "$W_L")" "$(mkbar "$rx" "$maxr" "$W_B" "$C_DOWN")" "$(mkbar "$tx" "$maxt" "$W_B" "$C_UP")" "$(padtext "$(human "$tot")" "$W_V")"
   done
   hborder '└' '┴' '┘'
   echo
