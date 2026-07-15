@@ -5,11 +5,12 @@
 # netty — render vnStat traffic stats as a clean, aligned bar-chart table.
 # Parses vnStat's textual output (no JSON, no jq). No estimates shown.
 #
-# Usage: netty [-i iface] [-w [N]] [-d|-m]
+# Usage: netty [-i iface] [-w [N]] [-d [N]|-m]
 #   -i iface   select interface (default: first in database)
 #   -w [N]     weekly view: a week of per-day rows. N=1 (default) = most recent
 #              7 days, N=2 = the week before, etc.
-#   -d         daily only (today)  [default]
+#   -d [N]     daily view: a single day's row. N=1 (default) = today,
+#              N=2 = yesterday, N=3 = two days ago, etc.
 #   -m         monthly only
 #   (default shows the Daily section only)
 import os
@@ -188,6 +189,7 @@ def main():
     iface = ""
     week = 0
     wnum = 1
+    dnum = 1
     show_daily = 1
     show_monthly = 0
     args = sys.argv[1:]
@@ -210,6 +212,9 @@ def main():
         elif a == "-d":
             show_daily = 1
             show_monthly = 0
+            if i + 1 < len(args) and re.fullmatch(r"\d+", args[i + 1]):
+                dnum = int(args[i + 1])
+                i += 1
             i += 1
         elif a in ("-h", "--help"):
             print(__doc__)
@@ -253,7 +258,8 @@ def main():
         )
     else:
         if show_daily:
-            today = days[-1:] if n else []
+            idx = n - dnum
+            today = [days[idx]] if 0 <= idx < n else []
             render_section("Daily", list(reversed(today)))
         if show_monthly:
             render_section("Monthly", list(reversed(months)))

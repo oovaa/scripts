@@ -127,7 +127,7 @@ netty [-i IFACE] [-w [N]] [-d | -m]
 | *(none)* | Daily view only (today). |
 | `-i IFACE` | Select a network interface (default: whatever `vnstat` reports first). |
 | `-w [N]` | **Weekly** view: a fixed 7-row table for week *N*. `N=1` (default) = the 7 days ending today; `N=2` = the previous 7 days; `N=3` = the week before that, etc. |
-| `-d` | Daily view only (explicit). |
+| `-d [N]` | **Daily** view: a single day's row. `N=1` (default) = today; `N=2` = yesterday; `N=3` = two days ago; etc. If that day has no data, prints an empty table. |
 | `-m` | Monthly view only. |
 | `-h`, `--help` | Print the usage banner. |
 
