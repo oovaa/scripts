@@ -34,7 +34,7 @@ To pre-provision it yourself (optional):
 
 ```bash
 uv venv ~/.local/share/netty/venv
-uv pip install --python ~/.local/share/netty/venv/bin/python rich
+uv pip install --python ~/.local/share/netty/venv rich
 ```
 
 The script carries inline [PEP 723](https://peps.python.org/pep-0723/) metadata
@@ -110,8 +110,8 @@ Then just run it:
 netty
 ```
 
-> If you prefer not to use the `uv` shebang, you can also run it explicitly
-> with `uv run ~/repos/scripts/netty`, or install `rich` into a venv and call
+> If you'd rather run it explicitly, you can also invoke
+> `uv run ~/repos/scripts/netty`, or install `rich` into any venv and call
 > the script's Python directly.
 
 ---
@@ -119,7 +119,7 @@ netty
 ## Usage
 
 ```
-netty [-i IFACE] [-w [N]] [-d | -m]
+netty [-i IFACE] [-w [N]] [-d [N] | -m]
 ```
 
 | Flag | Description |
@@ -179,6 +179,8 @@ netty -w         # week 1 (last 7 days)
 netty -w 2       # the previous week
 netty -w 3       # the week before that
 netty -m         # current month
+netty -d 2       # yesterday
+netty -d 7       # a week ago
 netty -i eth0    # a specific interface
 netty -i wlp2s0 -w
 ```

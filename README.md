@@ -26,16 +26,17 @@ Usage: `./uniupdate`
 
 Renders `vnstat` traffic statistics (daily / weekly / monthly) as a clean, aligned bar chart with download/upload split. Parses vnStat's textual output (no JSON/jq needed), so it works across vnStat versions. No estimates shown.
 
-Usage: `./netty [-i interface] [-w [N]] [-d|-m]`
+Usage: `./netty [-i interface] [-w [N]] [-d [N]|-m]`
 
-By default shows the Daily section only (today). `-w` shows a weekly view (per-day rows for the most recent 7 days); `-w 2` shows the previous week, `-w 3` the one before (N defaults to 1). A week with no data prints `no data for week N`. `-m` shows the Monthly section, `-d` the Daily section explicitly.
+By default shows the Daily section only (today). `-w [N]` shows a weekly view (per-day rows for week *N*; N=1 = most recent 7 days, N=2 = the previous week, etc.). `-d [N]` shows a single day: N=1 = today, N=2 = yesterday, etc. `-m` shows the Monthly section. A week/day with no data prints an empty table. `-d`/`daily` and `-w`/`weekly` can be combined with `-i`.
 
 ## Requirements
 
-- Python 3.10+ and [`uv`](https://github.com/astral-sh/uv) on your `PATH` (used to run the script)
+- Python 3.10+ (`python3` on your `PATH`)
+- `uv` (optional, preferred) — used to create the venv and install `rich` on first run; falls back to `python3 -m venv` if absent
 - `vnstat`
 
-No manual install of `rich`: the script carries inline PEP 723 metadata, and its shebang runs it via `uv run --script`, which provisions `rich` into an ephemeral environment automatically on first run. Just run `./netty` (or `uv run netty`).
+No manual install of `rich`: the script's shebang (`#!/usr/bin/env python3`) runs it directly. On first run it creates a venv at `~/.local/share/netty/venv`, installs `rich` into it, and re-execs that venv's Python. Subsequent runs start instantly via the venv. Just run `./netty`.
 
 For each script, additional requirements may apply (e.g., Git, nmcli, npm, pip)
 
