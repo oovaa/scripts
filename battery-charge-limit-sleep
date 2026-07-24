@@ -1,0 +1,12 @@
+#!/bin/bash
+#
+# Sleep hook for battery-charge-limit
+# Install: sudo install -m 755 this-script /usr/lib/systemd/system-sleep/
+#
+# Sets conservation mode on before suspend so the firmware stops at 60%
+# while the OS is asleep. The main daemon (battery-charge-limit) handles
+# runtime limits and re-enables charging on resume if below 60%.
+
+case $1 in
+    pre) echo 1 > /sys/class/power_supply/BAT1/extensions/ideapad_laptop/conservation_mode ;;
+esac

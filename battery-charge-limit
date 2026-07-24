@@ -1,0 +1,73 @@
+#!/bin/bash
+#
+# battery-charge-limit — Lenovo conservation mode at 80%
+#
+# Sysfs conservation_mode lives under the ideapad_laptop extension.
+# Only works on Lenovo Ideapad (and some Thinkpad) models.
+#
+# Usage:
+#   sudo ./battery-charge-limit          # run as daemon (foreground)
+#   sudo ./battery-charge-limit --install  # install systemd service
+#
+# Systemd service (install once):
+#   [Unit]
+#   Description=Battery charge limit at 80%
+#   After=multi-user.target
+#
+#   [Service]
+#   Type=simple
+#   ExecStart=/usr/local/bin/battery-charge-limit
+#   Restart=always
+#   RestartSec=10
+#
+#   [Install]
+#   WantedBy=multi-user.target
+#
+# Sleep hook (install at /usr/lib/systemd/system-sleep/battery-charge-limit):
+#   #!/bin/bash
+#   case $1 in
+#       pre) echo 1 > /sys/class/power_supply/BAT1/extensions/ideapad_laptop/conservation_mode ;;
+#   esac
+
+CM=/sys/class/power_supply/BAT1/extensions/ideapad_laptop/conservation_mode
+CAP=/sys/class/power_supply/BAT1/capacity
+LIMIT=80
+RESUME=60
+
+# ponytail: global lock not needed; only this process writes to conservation_mode
+trap 'echo 1 > "$CM"' EXIT
+
+if [ "$1" = "--install" ]; then
+    install -m 755 "$0" /usr/local/bin/battery-charge-limit
+    cat > /etc/systemd/system/battery-charge-limit.service <<'SVC'
+[Unit]
+Description=Battery charge limit at 80%
+After=multi-user.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/battery-charge-limit
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+SVC
+    systemctl daemon-reload
+    systemctl enable --now battery-charge-limit
+    echo "installed and started"
+    exit 0
+fi
+
+while true; do
+    read -r cap < "$CAP"
+    read -r mode < "$CM"
+
+    if [ "$cap" -ge "$LIMIT" ] && [ "$mode" != "1" ]; then
+        echo 1 > "$CM"
+    elif [ "$cap" -le "$RESUME" ] && [ "$mode" != "0" ]; then
+        echo 0 > "$CM"
+    fi
+
+    sleep 60
+done
