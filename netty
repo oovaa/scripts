@@ -102,6 +102,21 @@ BAR_W = 20
 console = Console()
 
 
+def _check_vnstat():
+    """Check if vnstat is installed and accessible."""
+    try:
+        subprocess.run(
+            ["vnstat", "--version"],
+            capture_output=True,
+            stdin=subprocess.DEVNULL,
+            check=True,
+        )
+    except FileNotFoundError:
+        sys.exit("error: vnstat is not installed. Install it with your package manager (e.g., apt install vnstat, brew install vnstat)")
+    except subprocess.CalledProcessError:
+        sys.exit("error: vnstat failed to run. Check if the database needs initialization (vnstat -u -i <interface>)")
+
+
 def run(args):
     return subprocess.run(
         ["vnstat", *args], capture_output=True, text=True, stdin=subprocess.DEVNULL
@@ -186,6 +201,8 @@ def render_section(title, rows):
 
 
 def main():
+    _check_vnstat()
+
     iface = ""
     week = 0
     wnum = 1
