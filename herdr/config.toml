@@ -5,8 +5,12 @@ allow_nested = true
 
 [keys]
 prefix = "ctrl+space"
-previous_tab = ["prefix+p", "prefix+shift+h", "ctrl+alt+h"]
-next_tab = ["prefix+n", "prefix+shift+l", "ctrl+alt+l"]
+previous_tab = ["prefix+p", "prefix+shift+h", "ctrl+alt+["]
+next_tab = ["prefix+n", "prefix+shift+l", "ctrl+alt+]"]
+focus_pane_left = ["prefix+h", "ctrl+alt+h"]
+focus_pane_down = ["prefix+j", "ctrl+alt+j"]
+focus_pane_up = ["prefix+k", "ctrl+alt+k"]
+focus_pane_right = ["prefix+l", "ctrl+alt+l"]
 
 [ui.sound]
 enabled = true
